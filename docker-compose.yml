@@ -1,5 +1,5 @@
 services:
-  mc:
+  server:
     image: itzg/minecraft-server:latest
     tty: true
     stdin_open: true
@@ -9,5 +9,4 @@ services:
       EULA: "TRUE"
       VERSION: "1.20.1"
     volumes:
-      # attach the relative directory 'data' to the container's /data path
-      - ./data:/data
+      - ./server/data:/data
