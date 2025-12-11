@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "open-mine-pilot"
+version = "0.1.0"
+description = "An open-source AI agent designed to play Minecraft autonomously."
+readme = "README.md"
+authors = [
+  { name = "Unknown", email = "unknown@example.com" },
+]
+requires-python = ">=3.10"
+license = { text = "MIT" }
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+]
+
+dependencies = [
+  "javascript",
+]
+
+[project.urls]
+Homepage = "https://github.com/" # TODO: set actual repo URL if desired
+
+[tool.setuptools]
+package-dir = {"" = "."}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["open_mine_pilot*"]

@@ -1,6 +1,6 @@
-from .core import Core
-from .pilot import Pilot
-from .mineflayer_pilot import MineflayerPilot
+from .transport_base import TransportBase
+from .transport import Transport
+from .mineflayer_transport import MineflayerTransport
 
-__all__ = ["Core", "Pilot", "MineflayerPilot"]
+__all__ = ["TransportBase", "Transport", "MineflayerTransport"]
 

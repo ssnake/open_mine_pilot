@@ -1,6 +1,6 @@
 import time
 
-class Core:
+class TransportBase:
     def __init__(self):
         pass
     def on(self, event: str, *args: list, **kwargs: dict):

@@ -1,10 +1,10 @@
-from open_mine_pilot import Core, Pilot
+from open_mine_pilot import TransportBase, Transport
 from javascript import require, On, Once, AsyncTask, once, off
 
 mineflayer = require('mineflayer')
 
 
-class MineflayerPilot(Pilot):
+class MineflayerTransport(Transport):
     def __init__(self, host: str, port: int, username: str):
         super().__init__(username)
         self._bot = mineflayer.createBot({ 

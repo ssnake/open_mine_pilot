@@ -1,6 +1,6 @@
-from .core import Core
+from .transport_base import TransportBase
 
-class Pilot(Core):
+class Transport(TransportBase):
     def __init__(self, username: str):
         self._username = username
 
