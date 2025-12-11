@@ -1,4 +1,4 @@
-from src.open_mine_pilot import Core, Pilot
+from open_mine_pilot import Core, Pilot
 from javascript import require, On, Once, AsyncTask, once, off
 
 mineflayer = require('mineflayer')
