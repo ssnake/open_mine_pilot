@@ -16,6 +16,8 @@ class MineflayerTransport(Transport):
             'hideErrors': False 
         })
 
+        self._set_state(self.STATE_CONNECTING)
+
         self._init_connect_timer()
         self._bind_events()
     
