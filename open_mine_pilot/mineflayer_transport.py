@@ -1,4 +1,5 @@
 from open_mine_pilot import Transport
+
 from javascript import require, On, Once, AsyncTask, once, off
 from threading import Timer
 
@@ -15,6 +16,8 @@ class MineflayerTransport(Transport):
             'username': username, 
             'hideErrors': False 
         })
+
+
 
         self._set_state(self.STATE_CONNECTING)
 
@@ -42,9 +45,11 @@ class MineflayerTransport(Transport):
         @On(self._bot, 'chat')
         def _on_chat(this, username, message, *rest):
             self.on_chat(username, message)
+
         @On(self._bot, 'end')
         def _on_end(this, reason, *rest):
             self.on_end(reason)
+            
         @On(self._bot, 'error')
         def _on_error(this, error, *rest):
             self.on_error(error)

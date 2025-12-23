@@ -1,5 +1,5 @@
 import time
-
+from open_mine_pilot.core_agent import CoreAgent
 
 class Transport:
     STATE_IDLE = 'idle'
@@ -8,6 +8,7 @@ class Transport:
     STATE_DISCONNECTED = 'disconnected'
 
     def __init__(self, username: str):
+        self._agent = CoreAgent()
         self._username = username
         self._state = self.STATE_IDLE
 
@@ -31,7 +32,14 @@ class Transport:
         if self._username == username:
             return
         self._log(f'{username} said: {message}')
-        self.say(f'Hello {username}')
+        try:
+            reply = self._agent.run(username=username, message=message)
+            if reply:
+                self.say(reply)
+        except Exception as exc:
+            # keep behavior simple: log via base transport logger
+            self._log(f'agent error for chat from {username}: {exc}')            
+        
         
     def on_end(self, reason: str):
         self._log(f'Connection ended: {reason}')
@@ -43,6 +51,7 @@ class Transport:
     def on_spawn(self):
         self._log(f'{self._username} spawned')
         self._set_state(self.STATE_CONNECTED)
+        self.say(f'Hello')
 
     def on_login(self):
         self._log(f'{self._username} logged in')
