@@ -1,17 +1,20 @@
 from typing import Optional
-
+from .agent_state import State
 from langchain.tools import tool
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from langgraph.graph import MessagesState, StateGraph
+from langgraph.graph import StateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
 
 
-@tool
-def echo_tool(message: str) -> str:
-    """Echo back exactly the message that the player said in the game chat."""
-    return message
 
+def agent_node(state: State) -> Command[Literal["echo", "agent"]]:
+    """Agent node that decides when to call tools based on chat."""
+    return state
+
+def echo_node(state: State) -> State:
+    """Tools node that calls tools based on chat."""
+    return state
 
 class CoreAgent:
     """Core agent responsible for deciding when to call tools based on chat.
@@ -24,7 +27,7 @@ class CoreAgent:
     that can be sent back to the Minecraft chat.
     """
 
-    def __init__(self, system_prompt: Optional[str] = None, model: str = "gpt-4o-mini"):
+    def __init__(self, system_prompt: Optional[str] = None, model: str = "o3"):
         self._system_prompt = system_prompt or (
             "You are an in-game assistant for Minecraft. "
             "When a player says something that should be repeated back to them, "
@@ -32,18 +35,15 @@ class CoreAgent:
             "Use tools whenever they are appropriate."
         )
 
-        tools = [echo_tool]
-
-        llm = ChatOpenAI(model=model)
-        llm_with_tools = llm.bind_tools(tools)
-
-        graph = StateGraph(MessagesState)
-        graph.add_node("agent", llm_with_tools)
-        graph.add_node("tools", ToolNode(tools))
-        graph.set_entry_point("agent")
-        graph.add_conditional_edges("agent", tools_condition)
-        graph.add_edge("tools", "agent")
-
+        _reasoning_llm = ChatOpenAI(
+            model="o3",
+            model_kwargs={"response_format": {"type": "json_object"}},
+        )
+        graph = StateGraph(State)
+        graph.add_node("agent", agent_node)
+        graph.add_node("echo", echo_node)
+        graph.add_edge("echo", "agent")
+        graph.add_edge(StateGraph.START, "agent")
         self._app = graph.compile()
 
     def run(self, username: str, message: str) -> str:
