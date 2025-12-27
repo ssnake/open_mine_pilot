@@ -1,4 +1,8 @@
 from langgraph.graph import MessagesState
+from typing import Any, Optional
 
 class State(MessagesState):
-    user_query: Optional[str] # The user's original query
+    message: Optional[str] 
+    username: Optional[str]
+    llm: Any
+    transport: Any

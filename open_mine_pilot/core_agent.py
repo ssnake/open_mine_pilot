@@ -2,19 +2,10 @@ from typing import Optional
 from .agent_state import State
 from langchain.tools import tool
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langgraph.graph import StateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
+from .agent_graph import build_graph
 
-
-
-def agent_node(state: State) -> Command[Literal["echo", "agent"]]:
-    """Agent node that decides when to call tools based on chat."""
-    return state
-
-def echo_node(state: State) -> State:
-    """Tools node that calls tools based on chat."""
-    return state
 
 class CoreAgent:
     """Core agent responsible for deciding when to call tools based on chat.
@@ -39,29 +30,15 @@ class CoreAgent:
             model="o3",
             model_kwargs={"response_format": {"type": "json_object"}},
         )
-        graph = StateGraph(State)
-        graph.add_node("agent", agent_node)
-        graph.add_node("echo", echo_node)
-        graph.add_edge("echo", "agent")
-        graph.add_edge(StateGraph.START, "agent")
-        self._app = graph.compile()
+        self._app = build_graph()
 
     def run(self, username: str, message: str) -> str:
         """Run the agent on a single chat message and return the reply text.
 
-        The agent receives the player name and their message and decides
-        whether to use tools (e.g. echo_tool) or answer directly.
+        The agent receives the player name and their message.
         """
-        messages = [
-            SystemMessage(content=self._system_prompt),
-            HumanMessage(content=f"Player {username} said: {message}"),
-        ]
-
-        result = self._app.invoke({"messages": messages})
-        output_messages = result.get("messages", [])
-
-        ai_messages = [m for m in output_messages if isinstance(m, AIMessage)]
-        if not ai_messages:
-            return ""
-
-        return ai_messages[-1].content or ""
+        self._app.invoke({
+            "username": username, 
+            "message": message,
+            "llm": _reasoning_llm
+        })
