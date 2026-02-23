@@ -1,5 +1,5 @@
 # Python-generated files
-__pycache__/
+__pycache__
 *.py[oc]
 build/
 dist/
@@ -11,3 +11,5 @@ wheels/
 
 # Local test secrets
 .env.test
+server
+

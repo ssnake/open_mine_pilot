@@ -1,5 +1,7 @@
+from mineflayer.client import Client
 def main():
-    print("Hello from mine-agent!")
+    client = Client('localhost', 25565, 'test', None)
+    client.run()
 
 
 if __name__ == "__main__":
