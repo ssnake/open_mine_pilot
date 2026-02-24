@@ -10,3 +10,23 @@ services:
       VERSION: "1.20.1"
     volumes:
       - ./server/data:/data
+
+  viewer:
+    build:
+      context: .
+      dockerfile: viewer/Dockerfile
+    depends_on:
+      - server
+    restart: unless-stopped
+    ports:
+      - "${VIEWER_HOST_PORT:-3001}:3000"
+    volumes:
+      - ./viewer/index.js:/app/index.js
+    environment:
+      MC_HOST: "server"
+      MC_PORT: "25565"
+      MC_USERNAME: "viewer-bot"
+      MC_VERSION: "1.20.1"
+      VIEWER_PORT: "3000"
+      VIEWER_FIRST_PERSON: "false"
+      VIEWER_DISTANCE: "6"

@@ -1,0 +1,13 @@
+{
+  "name": "mine-agent-viewer",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Prismarine viewer bot for local Minecraft server",
+  "main": "index.js",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "canvas": "^2.11.2",
+    "mineflayer": "^4.20.1",
+    "prismarine-viewer": "^1.33.0"
+  }
+}
