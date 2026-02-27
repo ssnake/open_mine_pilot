@@ -2,10 +2,13 @@ from typing import Any
 from javascript import require, On, Once, AsyncTask, once, off
 from threading import Timer
 import time
+from .tools import Tools
 
 
 mineflayer = require('mineflayer')
-
+# run `uv run python3 -m javascript --install canvas` to install canvas
+prismarineViewer   = require("prismarine-viewer")
+mineflayerViewer = prismarineViewer.mineflayer
 
 class Client:
     STATE_IDLE = 'idle'
@@ -14,31 +17,34 @@ class Client:
     STATE_DISCONNECTED = 'disconnected'
     
     def __init__(self, host: str, port: int, username: str, agent: Any):
-      self._agent = agent
-      self._state = self.STATE_IDLE
-      self._username = username
-      self._bot = mineflayer.createBot({ 
+        
+        self._agent = agent
+        self._state = self.STATE_IDLE
+        self._username = username
+        self._bot = mineflayer.createBot({ 
           'host': host, 
           'port': port, 
           'username': username, 
           'hideErrors': False 
-      })
+        })
 
-
-      self._set_state(self.STATE_CONNECTING)
-
-      self._init_connect_timer()
-      self._bind_events()
+        self._viewer = None
+            
+        self._set_state(self.STATE_CONNECTING)
+        self._tools = Tools(self._bot)
+        self._init_connect_timer()
+        self._bind_events()
     
         
     def run(self):
-        try:
-            self._log('run')
-            while True:
-                time.sleep(0.1)
-        except KeyboardInterrupt:
-            self._log('KeyboardInterrupt')
-            self._set_state(self.STATE_DISCONNECTED)
+        # try:
+        #     self._log('run')
+        #     while True:
+        #         time.sleep(0.1)
+        # except KeyboardInterrupt:
+        #     self._log('KeyboardInterrupt')
+        #     self._set_state(self.STATE_DISCONNECTED)
+        pass
     
     @property
     def state(self) -> str:
@@ -74,7 +80,10 @@ class Client:
         @On(self._bot, 'chat')
         def _on_chat(this, username, message, *rest):
             self._log(f'Chat: {username}: {message}')
-            pass
+            if username == 'Server':
+                @AsyncTask(start=True)
+                def start(task):
+                    self._tools.handle_message(message)
 
         @On(self._bot, 'end')
         def _on_end(this, reason, *rest):
@@ -89,7 +98,13 @@ class Client:
         @On(self._bot, 'spawn')
         def _on_spawn(this):
             self._log(f'Spawn')
+            # self._reassure_viewer()
+            self._set_state(self.STATE_CONNECTED)
             self._reset_connect_timer()
+            
+            @AsyncTask(start=True)
+            def start(task):
+                self._tools.handle_message('go')
             pass
 
         @On(self._bot, 'login')
@@ -110,3 +125,12 @@ class Client:
     
     def _log(self, message: str):
         print(f'{self._username}: {message}')
+
+    def _reassure_viewer(self):
+        if self._viewer is None:
+            self._viewer = mineflayerViewer(self._bot, {
+                'port': 3001,
+                'firstPerson': False,
+                'viewDistance': 6
+            })
+            self._log('viewer is initialized')
