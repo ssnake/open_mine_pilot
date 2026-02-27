@@ -18,10 +18,16 @@ class Tools:
 
         @On(self._bot, 'path_update')
         def on_path_update(this, r):
-            # print(f"path update: {r}")
-            # nodes_per_trick = (r.visitedNodes * 50 / r.time)
-            # print(f"path update: I can get there in {r.path.length} moves. Compution took ${r.time} ms. {r.visitedNodes} nodes, {nodes_per_trick} /nodes/tick")
-            print(f"path update")
+            visited_nodes = r.get('visitedNodes', 0) if isinstance(r, dict) else getattr(r, 'visitedNodes', 0)
+            elapsed_ms = r.get('time', 0) if isinstance(r, dict) else getattr(r, 'time', 0)
+            path = r.get('path', []) if isinstance(r, dict) else getattr(r, 'path', [])
+            path_len = len(path) if hasattr(path, '__len__') else 0
+            nodes_per_tick = (visited_nodes * 50 / elapsed_ms) if elapsed_ms else 0
+            print(
+                f"path update: I can get there in {path_len} moves. "
+                f"Computation took {elapsed_ms} ms. {visited_nodes} nodes, {nodes_per_tick} nodes/tick"
+            )
+
 
         @On(self._bot, 'path_reset')
         def on_path_reset(this, reason):
@@ -40,8 +46,9 @@ class Tools:
         if message == 'go':
             pos = self.get_my_position()
             print(f"my position: {pos}")
-            pos.z += 5
-            self.goto(pos)
+            # Never mutate bot.entity.position directly; build a new target position.
+            target = pos.offset(-100, 0, 0)
+            self.goto(target)
 
     def goto(self, point):
         print(f"going to: {point}")

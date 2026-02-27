@@ -31,9 +31,9 @@ class Client:
         self._viewer = None
             
         self._set_state(self.STATE_CONNECTING)
-        self._tools = Tools(self._bot)
         self._init_connect_timer()
         self._bind_events()
+        self._tools = Tools(self._bot)
     
         
     def run(self):
@@ -98,13 +98,13 @@ class Client:
         @On(self._bot, 'spawn')
         def _on_spawn(this):
             self._log(f'Spawn')
-            # self._reassure_viewer()
+            self._reassure_viewer()
             self._set_state(self.STATE_CONNECTED)
             self._reset_connect_timer()
             
-            @AsyncTask(start=True)
-            def start(task):
-                self._tools.handle_message('go')
+            # @AsyncTask(start=True)
+            # def start(task):
+            #     self._tools.handle_message('go')
             pass
 
         @On(self._bot, 'login')
