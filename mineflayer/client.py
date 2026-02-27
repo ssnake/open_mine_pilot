@@ -1,8 +1,8 @@
 from typing import Any
-from javascript import require, On, Once, AsyncTask, once, off
+from javascript import require
 from threading import Timer
-import time
 from .tools import Tools
+from .events import Events
 
 
 mineflayer = require('mineflayer')
@@ -32,8 +32,9 @@ class Client:
             
         self._set_state(self.STATE_CONNECTING)
         self._init_connect_timer()
-        self._bind_events()
         self._tools = Tools(self._bot)
+        self._events = Events(self, self._bot)
+        self._events.bind()
     
         
     def run(self):
@@ -75,49 +76,6 @@ class Client:
         if hasattr(self, '_connect_timeout') and self._connect_timeout is not None:
             self._connect_timeout.cancel()
             self._connect_timeout = None
-
-    def _bind_events(self):
-        @On(self._bot, 'chat')
-        def _on_chat(this, username, message, *rest):
-            self._log(f'Chat: {username}: {message}')
-            if username == 'Server':
-                @AsyncTask(start=True)
-                def start(task):
-                    self._tools.handle_message(message)
-
-        @On(self._bot, 'end')
-        def _on_end(this, reason, *rest):
-            self._log(f'End: {reason}')
-            pass
-            
-        @On(self._bot, 'error')
-        def _on_error(this, error, *rest):
-            self._log(f'Error: {error}')
-            pass
-
-        @On(self._bot, 'spawn')
-        def _on_spawn(this):
-            self._log(f'Spawn')
-            self._reassure_viewer()
-            self._set_state(self.STATE_CONNECTED)
-            self._reset_connect_timer()
-            
-            # @AsyncTask(start=True)
-            # def start(task):
-            #     self._tools.handle_message('go')
-            pass
-
-        @On(self._bot, 'login')
-        def _on_login(this):
-            self._log(f'Login')
-            pass
-
-        # keep a reference so the handler is not garbage-collected
-        self._on_chat = _on_chat
-        self._on_end = _on_end
-        self._on_error = _on_error
-        self._on_spawn = _on_spawn
-        self._on_login = _on_login
 
     def on_unable_to_connect(self, reason: str):
         self._log(f'Unable to connect: {reason}')
