@@ -1,5 +1,5 @@
 from javascript import On, AsyncTask
-
+import asyncio
 
 class Events:
     def __init__(self, client, bot):
@@ -15,9 +15,11 @@ class Events:
         def on_chat(this, username, message, *rest):
             self._log(f'Chat: {username}: {message}')
             if username == 'Server':
-                @AsyncTask(start=True)
-                def start(task):
-                    self._client.agent.call('Go forward for 5 blocks')
+                result = asyncio.run(self._client.agent.call('Go forward for 5 blocks'))
+                self._bot.chat(result)
+                # @AsyncTask(start=True)
+                # def start(task):
+                #     self._client.agent.call('Go forward for 5 blocks')
 
         @On(self._bot, 'end')
         def on_end(this, reason, *rest):
@@ -33,6 +35,7 @@ class Events:
             self._client._reassure_viewer()
             self._client._set_state(self._client.STATE_CONNECTED)
             self._client._reset_connect_timer()
+            # asyncio.run(self._client.agent.call('Go forward for 5 blocks'))
 
         @On(self._bot, 'login')
         def on_login(this):
@@ -41,7 +44,8 @@ class Events:
         @On(self._bot, 'goal_reached')
         def on_goal_reached(this, goal):
             self._log('goal reached!!!!')
-            self._client.agent.call('Goal reached', 'mob')
+            result = asyncio.run(self._client.agent.call('Goal reached'))
+            self._bot.chat(result)
 
         @On(self._bot, 'path_update')
         def on_path_update(this, r):

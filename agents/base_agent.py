@@ -14,13 +14,13 @@ class BaseAgent:
         self._init_session()
         self._init_runner()    
 
-    def call(self, message, role='user'):
+    async def call(self, message, role='user') -> str:
         self._log(f'{role}: {message}')
         final_response_text = "Agent did not produce a final response." # Default
         content = types.Content(role=role, parts=[types.Part(text=message)])
-        
-        for event in self._runner.run(user_id=self._USER_ID, session_id=self._SESSION_ID, new_message=content):
-            self._log(f"  [Event] Author: {event.author}, Type: {type(event).__name__}, Final: {event.is_final_response()}, Content: {event.content}")
+
+        async for event in self._runner.run_async(user_id=self._USER_ID, session_id=self._SESSION_ID, new_message=content):
+            self._log(f"[Event] Author: {event.author}, Type: {type(event).__name__}, Final: {event.is_final_response()}, Content: {event.content}")
             if event.is_final_response():          
                 if event.content and event.content.parts:
                     # Assuming text response in the first part
@@ -36,9 +36,11 @@ class BaseAgent:
             name="main_minecraft_agent",
             model="gemini-2.5-flash",
             description="The main coordinator agent. Handles direct question or can delegate to subagents.",
-            instruction="You are a minecraft agent control a mob in the game. You must execute the user's orders. You can use tools to interact with the game. Async tools should be final responses. There are rols: user, agent, mob. User is a player, agent is you, mob is a mob you control. You are agent.",
+            instruction="You are a minecraft agent control a mob in the game. You must execute the user's orders. You can use tools to interact with the game. If async tool is called successfully do not wait for it to finish. Make response as final. Follow up event will trigger you later.",
             tools=[
                 self._tools.get_my_position,
+                self._tools.get_my_orientation,
+                self._tools.set_my_orientation,
                 self._tools.goto_position
             ],
         )

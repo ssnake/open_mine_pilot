@@ -4,7 +4,7 @@ from threading import Timer
 from .tools import Tools
 from .events import Events
 from agents.base_agent import BaseAgent
-
+import time
 mineflayer = require('mineflayer')
 # run `uv run python3 -m javascript --install canvas` to install canvas
 prismarineViewer   = require("prismarine-viewer")
@@ -38,13 +38,13 @@ class Client:
     
         
     def run(self):
-        # try:
-        #     self._log('run')
-        #     while True:
-        #         time.sleep(0.1)
-        # except KeyboardInterrupt:
-        #     self._log('KeyboardInterrupt')
-        #     self._set_state(self.STATE_DISCONNECTED)
+        try:
+            self._log('run')
+            while True:
+                time.sleep(0.1)
+        except KeyboardInterrupt:
+            self._log('KeyboardInterrupt')
+            self._set_state(self.STATE_DISCONNECTED)
         pass
 
     @property

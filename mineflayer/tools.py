@@ -1,5 +1,6 @@
 from javascript import AsyncTask, require
 from typing import Any
+import math
 
 pathfinder = require("mineflayer-pathfinder")
 Vec3 = require("vec3").Vec3
@@ -63,6 +64,48 @@ class Tools:
         """
         return self._pos_to_dict(self._bot.entity.position)
 
+    def get_my_orientation(self) -> dict[str, float]:
+        """
+        Return the bot's current orientation.
+        yaw/pitch are in radians as used by mineflayer.
+        """
+        yaw = float(getattr(self._bot.entity, "yaw", 0.0))
+        pitch = float(getattr(self._bot.entity, "pitch", 0.0))
+        return {
+            "yaw": yaw,
+            "pitch": pitch
+        }
+
+    def set_my_orientation(
+        self,
+        yaw: float,
+        pitch: float,
+        degrees: bool = False,
+        force: bool = True,
+    ) -> dict[str, Any]:
+        """
+        Set the bot's look orientation.
+
+        Args:
+            yaw (float): Horizontal angle (radians by default).
+            pitch (float): Vertical angle (radians by default).
+            degrees (bool, optional): If true, treat inputs as degrees. Defaults to False.
+            force (bool, optional): Force immediate look update. Defaults to True.
+        """
+        yaw_rad = float(math.radians(yaw)) if degrees else float(yaw)
+        pitch_rad = float(math.radians(pitch)) if degrees else float(pitch)
+
+        @AsyncTask(start=True)
+        async def set_look(task):
+            await self._bot.look(yaw_rad, pitch_rad, bool(force))
+
+        return self._result(
+            True,
+            "Orientation update queued",
+            yaw=yaw_rad,
+            pitch=pitch_rad,
+        )
+
     def stop_pathing(self) -> dict[str, Any]:
         """
         Stop the current pathfinding action immediately.
@@ -82,14 +125,14 @@ class Tools:
         goal = pathfinder.goals.GoalNear(target.x, target.y, target.z, int(radius))
 
         @AsyncTask(start=True)
-        async def goto_block(task):
-            await self._bot.pathfinder.goto(goal)
+        def goto_block(task):
+            self._bot.pathfinder.goto(goal)
 
-        return self._result(True, "Navigating to target", target=self._pos_to_dict(target), radius=int(radius))
+        return self._result(True, "Goal target is set successfully", target=self._pos_to_dict(target), radius=int(radius))
 
     def goto_position(self, x: int, y: int, z: int, radius: int = 1) -> dict[str, Any]:
         """
-        Navigate near an absolute block position. This is async tool
+        Navigate near an absolute block position. This is async tool!
 
         Args:
             x (int): Target X coordinate.
@@ -319,6 +362,8 @@ class Tools:
         """
         return [
             "get_my_position",
+            "get_my_orientation",
+            "set_my_orientation",
             "goto_position",
             "stop_pathing",
             "follow_master",
