@@ -3,7 +3,7 @@ from javascript import require
 from threading import Timer
 from .tools import Tools
 from .events import Events
-
+from agents.base_agent import BaseAgent
 
 mineflayer = require('mineflayer')
 # run `uv run python3 -m javascript --install canvas` to install canvas
@@ -16,9 +16,8 @@ class Client:
     STATE_CONNECTED = 'connected'
     STATE_DISCONNECTED = 'disconnected'
     
-    def __init__(self, host: str, port: int, username: str, agent: Any):
+    def __init__(self, host: str, port: int, username: str):
         
-        self._agent = agent
         self._state = self.STATE_IDLE
         self._username = username
         self._bot = mineflayer.createBot({ 
@@ -35,6 +34,7 @@ class Client:
         self._tools = Tools(self._bot)
         self._events = Events(self, self._bot)
         self._events.bind()
+        self._agent = BaseAgent(self)
     
         
     def run(self):
@@ -46,7 +46,13 @@ class Client:
         #     self._log('KeyboardInterrupt')
         #     self._set_state(self.STATE_DISCONNECTED)
         pass
-    
+
+    @property
+    def tools(self):
+        return self._tools
+    @property
+    def agent(self):
+        return self._agent
     @property
     def state(self) -> str:
         return self._state

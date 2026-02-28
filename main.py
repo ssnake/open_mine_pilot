@@ -1,7 +1,8 @@
 from mineflayer.client import Client
+from agents.base_agent import BaseAgent
 
 def main():
-    client = Client('localhost', 25565, 'test', None)
+    client = Client('localhost', 25565, 'test')
     client.run()
 
 

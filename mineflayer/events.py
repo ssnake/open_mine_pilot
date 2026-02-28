@@ -17,7 +17,7 @@ class Events:
             if username == 'Server':
                 @AsyncTask(start=True)
                 def start(task):
-                    self._client._tools.handle_message(message)
+                    self._client.agent.call('Go forward for 5 blocks')
 
         @On(self._bot, 'end')
         def on_end(this, reason, *rest):
@@ -41,6 +41,7 @@ class Events:
         @On(self._bot, 'goal_reached')
         def on_goal_reached(this, goal):
             self._log('goal reached!!!!')
+            self._client.agent.call('Goal reached', 'mob')
 
         @On(self._bot, 'path_update')
         def on_path_update(this, r):
