@@ -16,10 +16,10 @@ class Client:
     STATE_CONNECTED = 'connected'
     STATE_DISCONNECTED = 'disconnected'
     
-    def __init__(self, host: str, port: int, username: str):
-        
+    def __init__(self, host: str, port: int, username: str, master_username: str):
         self._state = self.STATE_IDLE
         self._username = username
+        self._master_username = master_username
         self._bot = mineflayer.createBot({ 
           'host': host, 
           'port': port, 
@@ -32,9 +32,9 @@ class Client:
         self._set_state(self.STATE_CONNECTING)
         self._init_connect_timer()
         self._tools = Tools(self._bot)
-        self._events = Events(self, self._bot)
-        self._events.bind()
         self._agent = BaseAgent(self)
+        self._events = Events(self)
+        self._events.bind()
     
         
     def run(self):

@@ -3,6 +3,7 @@ from google.adk.sessions import InMemorySessionService
 from google.adk.runners import Runner
 from google.genai import types
 from dotenv import load_dotenv
+import asyncio
 
 load_dotenv()
 
@@ -14,13 +15,17 @@ class BaseAgent:
         self._init_session()
         self._init_runner()    
 
-    async def call(self, message, role='user') -> str:
-        self._log(f'{role}: {message}')
+    def call(self, message, role='user') -> str:
+        return asyncio.run(self.call_async(message, role))
+    
+    async def call_async(self, message, role='user') -> str:
+        self._log(f'call_async: message={message}, role={role}')
         final_response_text = "Agent did not produce a final response." # Default
         content = types.Content(role=role, parts=[types.Part(text=message)])
 
         async for event in self._runner.run_async(user_id=self._USER_ID, session_id=self._SESSION_ID, new_message=content):
-            self._log(f"[Event] Author: {event.author}, Type: {type(event).__name__}, Final: {event.is_final_response()}, Content: {event.content}")
+            self._debug_event(event)
+
             if event.is_final_response():          
                 if event.content and event.content.parts:
                     # Assuming text response in the first part
@@ -36,13 +41,12 @@ class BaseAgent:
             name="main_minecraft_agent",
             model="gemini-2.5-flash",
             description="The main coordinator agent. Handles direct question or can delegate to subagents.",
-            instruction="You are a minecraft agent control a mob in the game. You must execute the user's orders. You can use tools to interact with the game. If async tool is called successfully do not wait for it to finish. Make response as final. Follow up event will trigger you later.",
-            tools=[
-                self._tools.get_my_position,
-                self._tools.get_my_orientation,
-                self._tools.set_my_orientation,
-                self._tools.goto_position
-            ],
+            instruction=f"""
+            You are a minecraft agent control a mob in the game. You must execute the user's orders. You can use tools to interact with the game. If async tool is called successfully do not wait for it to finish. Make response as final. Follow up event will trigger you later.
+            
+            You master username is {self._bot._master_username}
+            """,
+            tools=self._tools.available_methods(),
         )
 
     def _init_session(self):
@@ -60,4 +64,21 @@ class BaseAgent:
 
     def _log(self, message):
         print(f'[{self._APP_NAME}]: {message}')
-        
+    
+    def _debug_event(self, event):
+        self._log(f"[Event] Author: {event.author}, Type: {type(event).__name__}, Final: {event.is_final_response()}")
+        if event.content and event.content.parts:
+            calls = event.get_function_calls()
+            for call in calls:
+                tool_name = call.name
+                arguments = call.args # This is usually a dictionary
+                self._log(f"Tool: {tool_name}, Args: {arguments}")
+            
+            responses = event.get_function_responses()
+            for response in responses:
+                tool_name = response.name
+                response  = response.response  # This is usually a dictionary
+                self._log(f"Tool: {tool_name}, response : {response}")
+
+            if event.content.parts[0].text:
+                self._log(f"Text: {event.content.parts[0].text}")
