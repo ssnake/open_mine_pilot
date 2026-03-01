@@ -76,6 +76,9 @@ class Tools:
 
         Args:
             username (str): Player name 
+
+        Returns:
+            dict[str, Any]: Player position {'x','y','z'} on success, or an error result.
         """
         entity = self._get_player_entity(username)
         if not entity:
@@ -85,6 +88,9 @@ class Tools:
     def get_my_position(self) -> dict[str, float]:
         """
         Return the bot's current position.
+
+        Returns:
+            dict[str, float]: Bot position with keys {'x','y','z'}.
         """
         return self._pos_to_dict(self._bot.entity.position)
 
@@ -93,6 +99,12 @@ class Tools:
         Return the bot's current orientation.
         yaw/pitch are in radians.
         yaw uses this tool's external convention, corrected from mineflayer by 180 degrees.
+
+        Useful when you need to reason about where the bot is currently facing
+        before calling set_my_orientation.
+
+        Returns:
+            dict[str, float]: Orientation with keys {'yaw','pitch'} in radians.
         """
         bot_yaw = float(getattr(self._bot.entity, "yaw", 0.0))
         pitch = float(getattr(self._bot.entity, "pitch", 0.0))
@@ -109,12 +121,20 @@ class Tools:
         force: bool = True,
     ) -> dict[str, Any]:
         """
-        Set the bot's look orientation.
+        Set the bot's look orientation immediately.
 
         Args:
             yaw (float): Horizontal angle (radians, external tool convention).
             pitch (float): Vertical angle (radians by default).
             force (bool, optional): Force immediate look update. Defaults to True.
+
+        Notes for agent usage:
+            - This tool is synchronous and returns immediately.
+            - After calling this tool successfully, provide a short final text response
+              to the user (for example: "I'm looking at you now.").
+
+        Returns:
+            dict[str, Any]: Standard success/error result with echoed yaw/pitch.
         """
         bot_yaw = self._normalize_angle(float(yaw) + math.pi)
         self._bot.look(bot_yaw, float(pitch), bool(force))
@@ -128,6 +148,9 @@ class Tools:
     def stop_pathing(self) -> dict[str, Any]:
         """
         Stop the current pathfinding action immediately.
+
+        Returns:
+            dict[str, Any]: Standard success/error result.
         """
         self._bot.pathfinder.stop()
         return self._result(True, "Pathing stopped")
@@ -141,6 +164,9 @@ class Tools:
             y (int): Target Y coordinate.
             z (int): Target Z coordinate.
             radius (int, optional): Acceptable distance from target. Defaults to 1.
+
+        Returns:
+            dict[str, Any]: Standard success/error result with target and radius.
         """
 
         target = Vec3(int(x), int(y), int(z))
@@ -155,6 +181,9 @@ class Tools:
         Args:
             username (str): Player name to follow.
             distance (int, optional): Follow distance in blocks. Defaults to 2.
+
+        Returns:
+            dict[str, Any]: Standard success/error result with follow distance.
         """
         entity = self._get_player_entity(username)
         if not entity:
@@ -167,6 +196,9 @@ class Tools:
     def stop_following(self) -> dict[str, Any]:
         """
         Stop following any player.
+
+        Returns:
+            dict[str, Any]: Standard success/error result.
         """
         self._follow_master = None
         self._bot.pathfinder.setGoal(None)
@@ -180,6 +212,9 @@ class Tools:
             x (int): Block X coordinate.
             y (int): Block Y coordinate.
             z (int): Block Z coordinate.
+
+        Returns:
+            dict[str, Any]: Standard success/error result for queued mining action.
         """
         target = Vec3(int(x), int(y), int(z))
         block = self._bot.blockAt(target)
@@ -205,6 +240,9 @@ class Tools:
         Args:
             block_name (str): Minecraft block id, e.g. 'stone' or 'oak_log'.
             max_distance (int, optional): Search radius in blocks. Defaults to 32.
+
+        Returns:
+            dict[str, Any]: Standard success/error result.
         """
         block_id = self._get_block_id(block_name)
         if block_id is None:
@@ -220,6 +258,9 @@ class Tools:
 
         Args:
             positions (list[Any], optional): List of positions (Vec3, [x,y,z], or {x,y,z}). Defaults to None.
+
+        Returns:
+            dict[str, Any]: Standard success/error result with queued item count.
         """
         if not positions:
             return self._result(False, "No positions provided")
@@ -269,6 +310,9 @@ class Tools:
             y (int): Target Y coordinate.
             z (int): Target Z coordinate.
             item_name (str): Inventory item id, e.g. 'cobblestone'.
+
+        Returns:
+            dict[str, Any]: Standard success/error result for queued placement action.
         """
         target_pos = Vec3(int(x), int(y), int(z))
         target_block = self._bot.blockAt(target_pos)
@@ -303,6 +347,9 @@ class Tools:
 
         Args:
             placements (list[dict], optional): Entries like {'x': int, 'y': int, 'z': int, 'block': str}. Defaults to None.
+
+        Returns:
+            dict[str, Any]: Standard success/error result with queued item count.
         """
         if not placements:
             return self._result(False, "No placements provided")
@@ -352,6 +399,9 @@ class Tools:
         Args:
             mine_positions (list[Any], optional): Positions to mine. Defaults to None.
             place_positions (list[dict], optional): Placement entries with coordinates and block/item name. Defaults to None.
+
+        Returns:
+            dict[str, Any]: Standard success/error result with mine/place totals.
         """
         self.mine_blocks_at_positions(mine_positions)
         self.place_blocks_at_positions(place_positions)
@@ -366,6 +416,9 @@ class Tools:
         """
         Return bound callables intended for ADK function-calling.
         ADK expects Callables/BaseTool objects, not method-name strings.
+
+        Returns:
+            list[callable]: List of bound tool methods exposed to ADK.
         """
         method_names = [
             "get_my_position",
