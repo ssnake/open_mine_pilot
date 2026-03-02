@@ -53,7 +53,6 @@ class InventoryTools(Base):
     def equip_item(self, item_name: str, destination: str = "hand") -> dict[str, Any]:
         """
         Equip an item from inventory to a specific destination (hand, head, torso, legs, feet, off-hand).
-        If you are in creative mode, you can equip items that are not in your inventory.
 
         Args:
             item_name (str): The name of the item to equip.
