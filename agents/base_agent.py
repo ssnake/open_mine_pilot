@@ -37,6 +37,10 @@ class BaseAgent:
         return final_response_text
 
     def _init_agents(self):
+        knowledge = """
+        Knowledge about the Minecraft world:
+        - Items and blocks in Minecraft are usually prefixed with 'minecraft:'. For example: 'minecraft:diamond_helmet', 'minecraft:iron_pickaxe', 'minecraft:dirt', etc.
+        """
         self._root_agent = Agent(
             name="main_minecraft_agent",
             model="gemini-2.5-flash",
@@ -45,6 +49,8 @@ class BaseAgent:
             You are a minecraft agent control a mob in the game. You must execute the user's orders. You can use tools to interact with the game. If async tool is called successfully do not wait for it to finish. Make response as final. Follow up event will trigger you later.
             
             You master username is {self._bot._master_username}
+            
+            {knowledge}
             """,
             tools=self._tools.available_methods(),
         )
