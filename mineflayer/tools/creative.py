@@ -10,6 +10,16 @@ class CreativeTools(Base):
         """
         Gives the bot the specified item in the specified inventory slot.
         This only works in creative mode.
+
+        The "Map" of your Inventory
+        Imagine your inventory screen is laid out like a spreadsheet. Minecraft numbers them in this specific order:
+        Slot Range	What’s there?
+        0	Crafting Output slot
+        1 – 4	The 2x2 Crafting Grid
+        5 – 8	Armor slots (Helmet, Chestplate, Leggings, Boots)
+        9 – 35	The Main Backpack (3 rows of 9)
+        36 – 44	The Hotbar (The 9 slots at the bottom)
+        45	The Off-hand (Left hand)
         
         Args:
             slot (int): The inventory window coordinate (e.g., 36 is the first quickbar slot).
