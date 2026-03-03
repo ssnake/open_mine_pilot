@@ -8,9 +8,9 @@ import asyncio
 load_dotenv()
 
 class BaseAgent:
-    def __init__(self, bot):
-        self._bot = bot
-        self._tools = bot.tools 
+    def __init__(self, client):
+        self._client = client
+        self._tools = client.tools 
         self._init_agents()
         self._init_session()
         self._init_runner()    
@@ -46,9 +46,9 @@ class BaseAgent:
             model="gemini-2.5-flash",
             description="The main coordinator agent. Handles direct question or can delegate to subagents.",
             instruction=f"""
-            You are a minecraft agent control a mob in the game. You must execute the user's orders. You can use tools to interact with the game. If async tool is called successfully do not wait for it to finish. Make response as final. Follow up event will trigger you later.
+            You are a minecraft agent control a mob in the game. You must execute the master user's orders. You can use tools to interact with the game.
             
-            You master username is {self._bot._master_username}
+            You master username is {self._client._master_username}
             
             {knowledge}
             """,

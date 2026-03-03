@@ -1,7 +1,6 @@
 from javascript import On, AsyncTask
-import asyncio
 
-class Events:
+class PathfindingEvents:
     def __init__(self, client):
         self._client = client
         self._bot = client._bot
@@ -11,39 +10,13 @@ class Events:
         print(f"[Events]: {message}")
 
     def bind(self):
-        @On(self._bot, 'chat')
-        def on_chat(this, username, message, *rest):
-            self._log(f'Chat: {username}: {message}')
-            if username == self._client._master_username:
-                @AsyncTask(start=True)
-                def call_agent(task):
-                    result = self._client.agent.call(message)
-                    self._bot.chat(result)
-
-        @On(self._bot, 'end')
-        def on_end(this, reason, *rest):
-            self._log(f'End: {reason}')
-
-        @On(self._bot, 'error')
-        def on_error(this, error, *rest):
-            self._log(f'Error: {error}')
-
-        @On(self._bot, 'spawn')
-        def on_spawn(this):
-            self._log('Spawn')
-            self._client._reassure_viewer()
-            self._client._set_state(self._client.STATE_CONNECTED)
-            self._client._reset_connect_timer()
-
-        @On(self._bot, 'login')
-        def on_login(this):
-            self._log('Login')
-        
         @On(self._bot, 'goal_reached')
         def on_goal_reached(this, goal):
             self._log('goal reached!!!!')
-            result = self._client.agent.call('Goal reached')
-            self._bot.chat(result)
+            @AsyncTask(start=True)
+            def call_agent(task):
+                result = self._client.agent.call('Goal reached')
+                self._bot.chat(result)
 
         @On(self._bot, 'path_update')
         def on_path_update(this, r):
@@ -66,4 +39,4 @@ class Events:
             self._log('pathing has stopped')
         
         # Keep references so handlers are not garbage-collected.
-        self._handlers = [on_chat, on_end, on_error, on_spawn, on_login, on_goal_reached, on_path_update, on_path_reset, on_path_stop]
+        self._handlers = [on_goal_reached, on_path_update, on_path_reset, on_path_stop]

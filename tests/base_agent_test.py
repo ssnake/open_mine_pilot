@@ -7,11 +7,11 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
-from agents.base import base_agent
+from agents.base_agent import BaseAgent
 
 
 def test_base_agent_exists():
-    assert base_agent is not None
+    assert BaseAgent is not None
 
 
 @pytest.mark.skipif(
@@ -32,9 +32,18 @@ def test_base_agent_answers_prompt():
         )
     )
     
+    class MockTools:
+        def available_methods(self):
+            return []
+
+    class MockClient:
+        def __init__(self):
+            self.tools = MockTools()
+            self._master_username = "master"
+
     runner = Runner(
         app_name=app_name,
-        agent=base_agent,
+        agent=BaseAgent(MockClient())._root_agent,
         session_service=session_service,
     )
 
