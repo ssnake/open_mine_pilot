@@ -30,7 +30,7 @@ class BasicEvents:
         @On(self._bot, 'spawn')
         def on_spawn(this):
             self._log('Spawn')
-            self._client._reassure_viewer()
+            # self._client._reassure_viewer()
             self._client._set_state(self._client.STATE_CONNECTED)
             self._client._reset_connect_timer()
 

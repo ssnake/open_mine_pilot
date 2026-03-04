@@ -17,7 +17,11 @@ class BaseAgent:
 
     def call(self, message, role='user') -> str:
         return asyncio.run(self.call_async(message, role))
-    
+
+    def game_update(self, message) -> str:
+        result = asyncio.run(self.call_async(f"game update: {message}", 'user'))
+        self._client.bot.whisper(self._client._master_username, result)
+
     async def call_async(self, message, role='user') -> str:
         self._log(f'call_async: message={message}, role={role}')
         final_response_text = "Agent did not produce a final response." # Default
@@ -39,11 +43,14 @@ class BaseAgent:
     def _init_agents(self):
         knowledge = """
         Knowledge about the Minecraft world:
+        - You must use only one tool at time
         - Items and blocks in Minecraft are usually prefixed with 'minecraft:'. For example: 'minecraft:diamond_helmet', 'minecraft:iron_pickaxe', 'minecraft:dirt', etc.
+        - When looking for a generic block type like "any log", you should provide all variations to `find_blocks` (e.g. `['oak_log', 'birch_log', 'spruce_log', 'jungle_log', 'acacia_log', 'dark_oak_log', 'mangrove_log', 'cherry_log']`).
+        - To mine a block, use `find_blocks` to find nearby blocks, `goto_position` to move near them, wait until you reach the place, once reached `start_dig` to mine it. Do not
         """
         self._root_agent = Agent(
             name="main_minecraft_agent",
-            model="gemini-2.5-flash",
+            model="gemini-3.1-flash-lite-preview",
             description="The main coordinator agent. Handles direct question or can delegate to subagents.",
             instruction=f"""
             You are a minecraft agent control a mob in the game. You must execute the master user's orders. You can use tools to interact with the game.

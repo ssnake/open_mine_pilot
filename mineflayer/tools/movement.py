@@ -111,7 +111,7 @@ class MovementTools(Base):
 
     def goto_position(self, x: int, y: int, z: int, radius: int = 1) -> dict[str, Any]:
         """
-        Navigate near an absolute block position
+        Navigate near an absolute block position. It's async command. Once you reach the goal event fires
 
         Args:
             x (int): Target X coordinate.

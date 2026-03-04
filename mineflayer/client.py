@@ -53,6 +53,11 @@ class Client:
     @property
     def agent(self):
         return self._agent
+
+    @property
+    def bot(self):
+        return self._bot
+
     @property
     def state(self) -> str:
         return self._state

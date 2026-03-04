@@ -36,7 +36,17 @@ class Base:
         return (float(angle) + math.pi) % (2 * math.pi) - math.pi
 
     def _get_block_id(self, block_name: str):
-        block = self._mc_data.blocksByName.get(block_name)
+        blocks_by_name = self._mc_data.blocksByName
+        
+        getter = getattr(blocks_by_name, "get", None)
+        if callable(getter):
+            block = getter(block_name)
+        else:
+            try:
+                block = blocks_by_name[block_name]
+            except Exception:
+                block = getattr(blocks_by_name, block_name, None)
+
         if not block:
             return None
         return block.id
