@@ -93,7 +93,7 @@ class Client:
         self._set_state(self.STATE_DISCONNECTED)    
     
     def _log(self, message: str):
-        print(f'{self._username}: {message}')
+        print(f'[Client]: {message}')
 
     def _reassure_viewer(self):
         if self._viewer is None:

@@ -31,7 +31,7 @@ class MineTool(Base):
         time_to_dig = self._bot.digTime(block)
         return self._result(True, "Calculated dig time", time_ms=time_to_dig)
 
-    def start_dig(self, x: int, y: int, z: int) -> dict[str, Any]:
+    def async_start_dig(self, x: int, y: int, z: int) -> dict[str, Any]:
         """
         Starts digging a block at the given coordinates.
         This is an asynchronous operation. You MUST WAIT for a `[SYSTEM EVENT: diggingCompleted]` or `[SYSTEM EVENT: diggingAborted]` before taking your next action. Do not call any other tools until you receive this event.
@@ -54,15 +54,16 @@ class MineTool(Base):
             return self._result(False, "The block at the given coordinates is 'air'. You cannot dig air.")
 
         if self._targetDigBlock:
-            return self._result(False, "Already digging another block.")
+            return self._result(False, "Already digging another block. Call stop_dig first.")
 
         try:
             # We don't await this as it's meant to be an ongoing action
             # The completion will be handled by events
-            self._bot.dig(block)
             self._targetDigBlock = block
+            self._bot.dig(block)
             return self._result(True, f"Started digging block `{block.name}`")
         except Exception as e:
+            self._targetDigBlock = None
             return self._result(False, f"Failed to start digging: {str(e)}")
 
     def stop_dig(self) -> dict[str, Any]:
@@ -79,4 +80,4 @@ class MineTool(Base):
         return self._result(True, f"Stopped digging block `{self._targetDigBlock.name}`")
 
     def available_methods(self):
-        return [self.start_dig, self.stop_dig, self.dig_time]
+        return [self.async_start_dig, self.stop_dig, self.dig_time]

@@ -7,6 +7,7 @@ import asyncio
 import threading
 import queue
 import uuid
+import traceback
 
 load_dotenv()
 
@@ -36,67 +37,34 @@ class BaseAgent:
                 elif task_type == 'system_event':
                     self._handle_system_event(*args)
             except Exception as e:
-                self._log(f"Error processing task: {e}")
+                self._log(f"Error processing task: {e}\n Stack trace: {traceback.format_exc()}")
             finally:
                 self._task_queue.task_done()
 
-    def enqueue_chat(self, message: str):
-        self._task_queue.put(('chat', (message,)))
+    def enqueue_chat(self, message: str, trace_id: str):
+        self._task_queue.put(('chat', (message, trace_id)))
 
-    def enqueue_system_event(self, event_name: str, message: str):
-        self._task_queue.put(('system_event', (event_name, message)))
+    def enqueue_system_event(self, event_name: str, message: str, trace_id: str):
+        self._task_queue.put(('system_event', (event_name, message, trace_id)))
 
-    def _handle_chat(self, message: str):
-        result = self.call(message)
+    def _handle_chat(self, message: str, trace_id: str):
+        result = self.call(message, trace_id)
         self._client.bot.whisper(self._client._master_username, result)
 
-    def _handle_system_event(self, event_name: str, message: str):
+    def _handle_system_event(self, event_name: str, message: str, trace_id: str):
         formatted_message = f"[SYSTEM EVENT: {event_name}] {message}"
-        result = self.call(formatted_message)
+        result = self.call(formatted_message, trace_id)
         self._client.bot.whisper(self._client._master_username, result)
-
-    def call(self, message) -> str:
-        trace_id = uuid.uuid4().hex
-        self._log(f'[call]: {message}', trace_id)
-        final_response_text = "Agent did not produce a final response." # Default
-        content = types.Content(role='user', parts=[types.Part(text=message)])
-        for event in self._runner.run(user_id=self._USER_ID, session_id=self._SESSION_ID, new_message=content):
-            self._debug_event(event, trace_id)
-
-            if event.is_final_response():          
-                if event.content and event.content.parts:
-                    # Assuming text response in the first part
-                    final_response_text = event.content.parts[0].text
-                elif event.actions and event.actions.escalate: # Handle potential errors/escalations
-                    final_response_text = f"Agent escalated: {event.error_message or 'No specific message.'}"
-                break # Stop processing events once the final response is found
-        return final_response_text
-
-    async def call_async(self, message, role='user') -> str:
-        self._log(f'call_async: message={message}, role={role}')
-        final_response_text = "Agent did not produce a final response." # Default
-        content = types.Content(role=role, parts=[types.Part(text=message)])
-
-        async for event in self._runner.run_async(user_id=self._USER_ID, session_id=self._SESSION_ID, new_message=content):
-            self._debug_event(event)
-
-            if event.is_final_response():          
-                if event.content and event.content.parts:
-                    # Assuming text response in the first part
-                    final_response_text = event.content.parts[0].text
-                elif event.actions and event.actions.escalate: # Handle potential errors/escalations
-                    final_response_text = f"Agent escalated: {event.error_message or 'No specific message.'}"
-                break # Stop processing events once the final response is found
-
-        return final_response_text
 
     def _init_agents(self):
         knowledge = """
         Knowledge about the Minecraft world:
-        - You must use only one tool at time
         - Items and blocks in Minecraft are usually prefixed with 'minecraft:'. For example: 'minecraft:diamond_helmet', 'minecraft:iron_pickaxe', 'minecraft:dirt', etc.
         - When looking for a generic block type like "any log", you should provide all variations to `find_blocks` (e.g. `['oak_log', 'birch_log', 'spruce_log', 'jungle_log', 'acacia_log', 'dark_oak_log', 'mangrove_log', 'cherry_log']`).
-        - Response of async tools should be final response
+        - Tool call that are waiting for event response must be with "finishReason": "STOP"
+        - You must use only one tool call at a time.
+        - Do not call another tool until you receive a response from the current tool.
+        - When async tool is called do not call another tool
         
         """
 
@@ -105,15 +73,17 @@ class BaseAgent:
 
         1. Mine a block
           - Tools must be called sequentially, one at a time. Call a tool, wait for its result, and only then proceed to the next step.
-          - To mine a block, first use `find_blocks` to locate nearby blocks of the desired type.wauiyuive`[SYSTEM EVENT: _rech]`
-          - Memoryze block name
-          - Use `goto_position` to navigate to the block's location. Wait until you havch `[SYSTEMeEVENT:ntion. This means] you M[SYSTEM EVENT: UST receive th]e '[goto_position tool] Mob reached goal' game update event before proceeding.
+          - To mine a block, first use `find_blocks` to locate nearby blocks of the desired type.
+          - Memorize block name
+          - Use `goto_position` to navigate to the block's location. Wait until you receive `[SYSTEM EVENT: pathfinding_reached_goal]` before proceeding.
           - Once reached, use `start_dig` to begin mining the block.
           - Mining is an asynchronous process. It is considered finished when you receive a game update event of either `diggingCompleted` or `diggingAborted`.
           - When block is finished make sure you mined correct block name
         """
         self._root_agent = Agent(
             name="main_minecraft_agent",
+            # model="gemini-3-flash-preview",
+            # model="gemini-2.5-flash",
             model="gemini-3.1-flash-lite-preview",
             description="The main coordinator agent. Handles direct question or can delegate to subagents.",
             instruction=f"""
@@ -141,8 +111,48 @@ class BaseAgent:
         self._runner = Runner(agent=self._root_agent, app_name=self._APP_NAME, session_service=self._session_service)
 
     def _log(self, message, trace_id=None):
-        print(f'[AGENT]:{trace_id} {message}')
-    
+        print(f'[Agent]:{trace_id} {message}')
+
+    def _is_function_response(self, event):
+        if not event.get_function_responses():
+            return False
+        
+    def _is_async_function_successful_response(self, event):
+        if not event.get_function_responses():
+            return False
+
+        response = event.get_function_responses()[0]
+        name = response.name
+        response  = response.response
+        return name.startswith('async_') and response.get("status") == "success"
+        
+    def _is_there_incoming_event(self, event):
+        return not self._task_queue.empty() and self._is_function_response(event)
+
+    def call(self, message, trace_id) -> str:
+        self._log(f'[call]: {message}', trace_id)
+        final_response_text = ""
+        content = types.Content(role='user', parts=[types.Part(text=message)])
+        for event in self._runner.run(user_id=self._USER_ID, session_id=self._SESSION_ID, new_message=content):
+            self._debug_event(event, trace_id)
+
+            if event.is_final_response():          
+                if event.content and event.content.parts:
+                    # Assuming text response in the first part
+                    final_response_text = event.content.parts[0].text
+                elif event.actions and event.actions.escalate: # Handle potential errors/escalations
+                    final_response_text = f"Agent escalated: {event.error_message or 'No specific message.'}"
+                break # Stop processing events once the final response is found
+
+            if self._is_async_function_successful_response(event):
+                self._log(f'[call]: Async function success response received', trace_id)
+                break
+
+            if self._is_there_incoming_event(event):
+                self._log(f'[call]: There are incoming events, breaking', trace_id)
+                break
+
+        return final_response_text      
     def _debug_event(self, event, trace_id=None):
         self._log(f"[Event]: Author: {event.author}, Type: {type(event).__name__}, Final: {event.is_final_response()}", trace_id)
         if event.content and event.content.parts:

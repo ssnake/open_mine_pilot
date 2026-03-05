@@ -1,3 +1,4 @@
+from .base import Base
 from .basic import BasicEvents
 from .pathfinding import PathfindingEvents
 from .mine import MineEvents

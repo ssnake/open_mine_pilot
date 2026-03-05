@@ -16,7 +16,7 @@ class MovementTools(Base):
             "get_my_position",
             "get_my_orientation",
             "set_my_orientation",
-            "goto_position",
+            "async_goto_position",
             "stop_pathing",
             "get_player_position",
             "follow_player",
@@ -109,10 +109,14 @@ class MovementTools(Base):
         self._bot.pathfinder.stop()
         return self._result(True, "Pathing stopped")
 
-    def goto_position(self, x: int, y: int, z: int, radius: int = 1) -> dict[str, Any]:
+    def async_goto_position(self, x: int, y: int, z: int, radius: int = 1) -> dict[str, Any]:
         """
         Navigate near an absolute block position. 
-        This is an asynchronous operation. You must WAIT for the game update event `[SYSTEM EVENT: goal_reached]` before performing your next action. Do not call any other tools until you receive this event.
+        This is an asynchronous operation. This tool call must be final. 
+        Once is called expect following events from system:
+        - `[SYSTEM EVENT: destination_reached]` - if you reach the destination successfully
+        - `[SYSTEM EVENT: destination_path_timeout]` - if pathing timed out
+        - `[SYSTEM EVENT: destination_path]` - if no path found
 
         Args:
             x (int): Target X coordinate.
