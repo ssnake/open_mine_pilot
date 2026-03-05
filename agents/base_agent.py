@@ -4,6 +4,9 @@ from google.adk.runners import Runner
 from google.genai import types
 from dotenv import load_dotenv
 import asyncio
+import threading
+import queue
+import uuid
 
 load_dotenv()
 
@@ -14,13 +17,60 @@ class BaseAgent:
         self._init_agents()
         self._init_session()
         self._init_runner()    
+        
+        self._task_queue = queue.Queue()
+        self._worker_thread = threading.Thread(target=self._process_queue, daemon=True)
+        self._worker_thread.start()
 
-    def call(self, message, role='user') -> str:
-        return asyncio.run(self.call_async(message, role))
+    def _process_queue(self):
+        self._log("Background worker thread started.")
+        while True:
+            task = self._task_queue.get()
+            if task is None:
+                break
+            
+            try:
+                task_type, args = task
+                if task_type == 'chat':
+                    self._handle_chat(*args)
+                elif task_type == 'system_event':
+                    self._handle_system_event(*args)
+            except Exception as e:
+                self._log(f"Error processing task: {e}")
+            finally:
+                self._task_queue.task_done()
 
-    def game_update(self, message) -> str:
-        result = asyncio.run(self.call_async(f"game update: {message}", 'user'))
+    def enqueue_chat(self, message: str):
+        self._task_queue.put(('chat', (message,)))
+
+    def enqueue_system_event(self, event_name: str, message: str):
+        self._task_queue.put(('system_event', (event_name, message)))
+
+    def _handle_chat(self, message: str):
+        result = self.call(message)
         self._client.bot.whisper(self._client._master_username, result)
+
+    def _handle_system_event(self, event_name: str, message: str):
+        formatted_message = f"[SYSTEM EVENT: {event_name}] {message}"
+        result = self.call(formatted_message)
+        self._client.bot.whisper(self._client._master_username, result)
+
+    def call(self, message) -> str:
+        trace_id = uuid.uuid4().hex
+        self._log(f'[call]: {message}', trace_id)
+        final_response_text = "Agent did not produce a final response." # Default
+        content = types.Content(role='user', parts=[types.Part(text=message)])
+        for event in self._runner.run(user_id=self._USER_ID, session_id=self._SESSION_ID, new_message=content):
+            self._debug_event(event, trace_id)
+
+            if event.is_final_response():          
+                if event.content and event.content.parts:
+                    # Assuming text response in the first part
+                    final_response_text = event.content.parts[0].text
+                elif event.actions and event.actions.escalate: # Handle potential errors/escalations
+                    final_response_text = f"Agent escalated: {event.error_message or 'No specific message.'}"
+                break # Stop processing events once the final response is found
+        return final_response_text
 
     async def call_async(self, message, role='user') -> str:
         self._log(f'call_async: message={message}, role={role}')
@@ -46,7 +96,21 @@ class BaseAgent:
         - You must use only one tool at time
         - Items and blocks in Minecraft are usually prefixed with 'minecraft:'. For example: 'minecraft:diamond_helmet', 'minecraft:iron_pickaxe', 'minecraft:dirt', etc.
         - When looking for a generic block type like "any log", you should provide all variations to `find_blocks` (e.g. `['oak_log', 'birch_log', 'spruce_log', 'jungle_log', 'acacia_log', 'dark_oak_log', 'mangrove_log', 'cherry_log']`).
-        - To mine a block, use `find_blocks` to find nearby blocks, `goto_position` to move near them, wait until you reach the place, once reached `start_dig` to mine it. Do not
+        - Response of async tools should be final response
+        
+        """
+
+        skills = """
+        Skills 
+
+        1. Mine a block
+          - Tools must be called sequentially, one at a time. Call a tool, wait for its result, and only then proceed to the next step.
+          - To mine a block, first use `find_blocks` to locate nearby blocks of the desired type.wauiyuive`[SYSTEM EVENT: _rech]`
+          - Memoryze block name
+          - Use `goto_position` to navigate to the block's location. Wait until you havch `[SYSTEMeEVENT:ntion. This means] you M[SYSTEM EVENT: UST receive th]e '[goto_position tool] Mob reached goal' game update event before proceeding.
+          - Once reached, use `start_dig` to begin mining the block.
+          - Mining is an asynchronous process. It is considered finished when you receive a game update event of either `diggingCompleted` or `diggingAborted`.
+          - When block is finished make sure you mined correct block name
         """
         self._root_agent = Agent(
             name="main_minecraft_agent",
@@ -58,6 +122,7 @@ class BaseAgent:
             You master username is {self._client._master_username}
             
             {knowledge}
+            {skills}
             """,
             tools=self._tools.available_methods(),
         )
@@ -75,23 +140,23 @@ class BaseAgent:
     def _init_runner(self):
         self._runner = Runner(agent=self._root_agent, app_name=self._APP_NAME, session_service=self._session_service)
 
-    def _log(self, message):
-        print(f'[{self._APP_NAME}]: {message}')
+    def _log(self, message, trace_id=None):
+        print(f'[AGENT]:{trace_id} {message}')
     
-    def _debug_event(self, event):
-        self._log(f"[Event] Author: {event.author}, Type: {type(event).__name__}, Final: {event.is_final_response()}")
+    def _debug_event(self, event, trace_id=None):
+        self._log(f"[Event]: Author: {event.author}, Type: {type(event).__name__}, Final: {event.is_final_response()}", trace_id)
         if event.content and event.content.parts:
             calls = event.get_function_calls()
             for call in calls:
                 tool_name = call.name
                 arguments = call.args # This is usually a dictionary
-                self._log(f"Tool: {tool_name}, Args: {arguments}")
+                self._log(f"Tool: {tool_name}, Args: {arguments}", trace_id)
             
             responses = event.get_function_responses()
             for response in responses:
                 tool_name = response.name
                 response  = response.response  # This is usually a dictionary
-                self._log(f"Tool: {tool_name}, response : {response}")
+                self._log(f"Tool: {tool_name}, response : {response}", trace_id)
 
             if event.content.parts[0].text:
-                self._log(f"Text: {event.content.parts[0].text}")
+                self._log(f"Text: {event.content.parts[0].text}", trace_id)

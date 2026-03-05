@@ -14,10 +14,7 @@ class BasicEvents:
         def on_chat(this, username, message, *rest):
             self._log(f'Chat: {username}: {message}')
             if username == self._client._master_username:
-                @AsyncTask(start=True)
-                def call_agent(task):
-                    result = self._client.agent.call(message)
-                    self._bot.chat(result)
+                self._client.agent.enqueue_chat(message)
 
         @On(self._bot, 'end')
         def on_end(this, reason, *rest):

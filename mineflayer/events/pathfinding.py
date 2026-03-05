@@ -14,9 +14,7 @@ class PathfindingEvents:
         @On(self._bot, 'goal_reached')
         def on_goal_reached(this, goal):
             self._log('goal reached!!!!')
-            @AsyncTask(start=True)
-            def call_agent(task):
-                self._agent.game_update('[goto_position tool] Mob reached goal')
+            self._agent.enqueue_system_event('goal_reached', 'Mob reached goal')
 
 
         # @On(self._bot, 'path_update')
@@ -34,16 +32,12 @@ class PathfindingEvents:
         @On(self._bot, 'path_reset')
         def on_path_reset(this, reason):
             self._log(f'path reset: {reason}')
-            @AsyncTask(start=True)
-            def call_agent(task):
-                self._agent.game_update(f"[goto_position or follow tools] Mob is on the path, but path was reset because of reason: {reason}")
+            self._agent.enqueue_system_event('path_reset', f"Mob is on the path, but path was reset because of reason: {reason}")
 
         @On(self._bot, 'path_stop')
         def on_path_stop(this):
             self._log('pathing has stopped')
-            @AsyncTask(start=True)
-            def call_agent(task):
-                self._agent.game_update(f"[goto_position or follow tools] Mob is on the path, but pathing was stopped")
+            self._agent.enqueue_system_event('path_stop', f"Mob is on the path, but pathing was stopped")
         
         # Keep references so handlers are not garbage-collected.
         self._handlers = [on_goal_reached, on_path_reset, on_path_stop]

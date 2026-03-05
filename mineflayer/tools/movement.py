@@ -111,7 +111,8 @@ class MovementTools(Base):
 
     def goto_position(self, x: int, y: int, z: int, radius: int = 1) -> dict[str, Any]:
         """
-        Navigate near an absolute block position. It's async command. Once you reach the goal event fires
+        Navigate near an absolute block position. 
+        This is an asynchronous operation. You must WAIT for the game update event `[SYSTEM EVENT: goal_reached]` before performing your next action. Do not call any other tools until you receive this event.
 
         Args:
             x (int): Target X coordinate.
