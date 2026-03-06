@@ -12,7 +12,7 @@ class PathfindingEvents(Base):
             trace_id = self.trace_id()
             msg = 'success: Mob reached destination'
             self._log(msg, trace_id)
-            self._agent.enqueue_system_event('pathfinding_result', msg, trace_id)
+            self._client.action_processor.enqueue_system_event('pathfinding_result', msg, trace_id)
 
         @On(self._bot, 'path_update')
         def on_path_update(this, data):
@@ -22,10 +22,10 @@ class PathfindingEvents(Base):
             # self._log(msg, trace_id)
             if status == 'timeout':
                 self._log(msg, trace_id)
-                self._agent.enqueue_system_event('pathfinding_result', 'error: Pathing timed out', trace_id)
+                self._client.action_processor.enqueue_system_event('pathfinding_result', 'error: Pathing timed out', trace_id)
             if status == 'noPath':
                 self._log(msg, trace_id)
-                self._agent.enqueue_system_event('pathfinding_result', 'error: No path found', trace_id)
+                self._client.action_processor.enqueue_system_event('pathfinding_result', 'error: No path found', trace_id)
                 
         @On(self._bot, 'path_reset')
         def on_path_reset(this, reason):
@@ -33,7 +33,7 @@ class PathfindingEvents(Base):
             msg = f'path reset: {reason}'
             self._log(msg, trace_id)
             if reason == 'stuck':
-                self._agent.enqueue_system_event('pathfinding_result', 'error: Mob is stuck', trace_id)
+                self._client.action_processor.enqueue_system_event('pathfinding_result', 'error: Mob is stuck', trace_id)
             # self._agent.enqueue_system_event('path_reset', f"Mob is on the path, but path was reset because of reason: {reason}", trace_id)
 
         @On(self._bot, 'path_stop')
@@ -41,7 +41,7 @@ class PathfindingEvents(Base):
             trace_id = self.trace_id()
             msg = "success: pathing was stopped"
             self._log(msg, trace_id)
-            self._agent.enqueue_system_event('pathfinding_result', msg, trace_id)
+            self._client.action_processor.enqueue_system_event('pathfinding_result', msg, trace_id)
         
         # Keep references so handlers are not garbage-collected.
         self._handlers = [on_goal_reached, on_path_reset, on_path_stop]

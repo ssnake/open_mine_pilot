@@ -1,4 +1,5 @@
 import threading
+import uuid
 
 class AgentStateMachine:
     STATE_IDLE = 'idle'
@@ -32,12 +33,13 @@ class AgentStateMachine:
     def _start_timer(self, expected_state: str):
         def _timeout():
             if self._state == expected_state:
+                trace_id = uuid.uuid4()
                 if self._log_callback:
-                    self._log_callback(f'State timeout: {self._state} after {self._timeout_duration}s', 'system')
+                    self._log_callback(f'State timeout: {self._state} after {self._timeout_duration}s', trace_id)
                 if self._agent:
                     # Reset state and inject a timeout event
                     self.set_state(self.STATE_IDLE)
-                    self._agent.enqueue_system_event('state_timeout', f'error: State {expected_state} timed out after {self._timeout_duration} seconds', 'system')
+                    self._agent._client.action_processor.enqueue_system_event('state_timeout', f'error: State {expected_state} timed out after {self._timeout_duration} seconds', trace_id)
 
         self._timeout_timer = threading.Timer(self._timeout_duration, _timeout)
         self._timeout_timer.daemon = True

@@ -1,10 +1,11 @@
-from google.adk.agents import Agent
-from google.adk.sessions import InMemorySessionService
-from google.adk.runners import Runner
-from google.genai import types
+import os
 from dotenv import load_dotenv
+from google.adk.agents import Agent
+from google.adk.runners import Runner
+from google.adk.sessions import InMemorySessionService
+from google import genai
+from google.genai import types
 import asyncio
-import threading
 import queue
 import uuid
 import traceback
@@ -15,53 +16,12 @@ load_dotenv()
 class BaseAgent:
     def __init__(self, client):
         self._client = client
-        self._task_queue = queue.Queue()
         self._tools = self._client.tools
         self.state_machine = AgentStateMachine(agent=self, log_callback=self._log)
 
         self._init_session()
         self._init_agents()
         self._init_runner()
-        self._thread = threading.Thread(target=self._worker, daemon=True)
-        self._thread.start()
-
-    def _worker(self):
-        while True:
-            try:
-                task = self._task_queue.get()
-                if task is None:
-                    break
-
-                task_type, args = task
-                if task_type == 'chat':
-                    self._handle_chat(*args)
-                elif task_type == 'system_event':
-                    self._handle_system_event(*args)
-            except Exception as e:
-                self._log(f"Error processing task: {e}")
-            finally:
-                self._task_queue.task_done()
-
-    def enqueue_chat(self, message: str, trace_id: str):
-        self._task_queue.put(('chat', (message, trace_id)))
-
-    def enqueue_system_event(self, event_name: str, message: str, trace_id: str):
-        self._task_queue.put(('system_event', (event_name, message, trace_id)))
-
-    def _handle_chat(self, message: str, trace_id: str):
-        result = self.call(message, trace_id)
-        if result:
-            self._client.whisper(self._client._master_username, result)
-
-    def _handle_system_event(self, event_name: str, message: str, trace_id: str):
-        # Filter events based on current state using the state machine
-        if not self.state_machine.filter_event(event_name, trace_id):
-            return
-        
-        formatted_message = f"[SYSTEM EVENT: {event_name}] {message}"
-        result = self.call(formatted_message, trace_id)
-        if result:
-            self._client.whisper(self._client._master_username, result)
 
     def _init_agents(self):
         knowledge = """
@@ -83,14 +43,14 @@ class BaseAgent:
           - Tools must be called sequentially, one at a time. Call a tool, wait for its result, and only then proceed to the next step.
           - To mine a block, first use `find_blocks` to locate nearby blocks of the desired type.
           - Memorize block name
-          - Use `goto_position` to navigate to the block's location. Wait until you receive `[SYSTEM EVENT: pathfinding_result]` before proceeding.
-          - Once reached, use `start_dig` to begin mining the block.
+          - if you're next to the block, use `start_dig` to begin mining the block.
+          - if needed use `goto_position` to navigate to the block's location. Wait until you receive `[SYSTEM EVENT: pathfinding_result]` before proceeding.
+          - Once you are at the block's location, use `start_dig` to begin mining the block.
           - Mining is an asynchronous process. It is considered finished when you receive a game update event of either `diggingCompleted` or `diggingAborted`.
           - When block is finished make sure you mined correct block name
         2. Pathing
           - make sure following is stopped before start
           - if you need to get any position use `async_goto_position`
-          - if you stuck, call `async_stop_pathing` first
           - if you stuck again, go to random position around you
         3. Event Timeouts
           - if an expected asynchronous event takes longer than 60 seconds, you will receive `[SYSTEM EVENT: state_timeout]`
@@ -132,6 +92,7 @@ class BaseAgent:
     def _is_function_response(self, event):
         if not event.get_function_responses():
             return False
+        return True
         
     def _is_async_function_successful_response(self, event):
         if not event.get_function_responses():
@@ -142,14 +103,15 @@ class BaseAgent:
         response  = response.response
         return name.startswith('async_') and response.get("status") == "success"
         
-    def _is_there_incoming_event(self, event):
-        return not self._task_queue.empty() and self._is_function_response(event)
+    def _is_there_incoming_event(self):
+        return self._client.action_processor.has_incoming_agent_events()
 
-    def call(self, message, trace_id) -> str:
+    async def call_async(self, message, trace_id) -> str:
         self._log(f'[call]: {message}', trace_id)
         final_response_text = ""
         content = types.Content(role='user', parts=[types.Part(text=message)])
-        for event in self._runner.run(user_id=self._USER_ID, session_id=self._SESSION_ID, new_message=content):
+        
+        async for event in self._runner.run_async(user_id=self._USER_ID, session_id=self._SESSION_ID, new_message=content):
             self._debug_event(event, trace_id)
 
             if event.is_final_response():          
@@ -164,11 +126,8 @@ class BaseAgent:
                 self._log(f'[call]: Async function success response received', trace_id)
                 break
 
-            if self._is_there_incoming_event(event):
-                self._log(f'[call]: There are incoming events, breaking', trace_id)
-                break
-
         return final_response_text      
+
     def _debug_event(self, event, trace_id=None):
         self._log(f"[Event]: Author: {event.author}, Type: {type(event).__name__}, Final: {event.is_final_response()}", trace_id)
         if event.content and event.content.parts:

@@ -17,7 +17,7 @@ class MovementTools(Base):
             "get_my_orientation",
             "set_my_orientation",
             "async_goto_position",
-            "async_stop_pathing",
+            "stop_pathing",
             "get_player_position",
             "follow_player",
             "stop_following",
@@ -99,19 +99,17 @@ class MovementTools(Base):
             pitch=float(pitch),
         )
 
-    def async_stop_pathing(self) -> dict[str, Any]:
+    def stop_pathing(self) -> dict[str, Any]:
         """
         Stop the current pathfinding action immediately.
-        This is an asynchronous operation. This tool call must be final. 
-        Once is called expect following event from system:
-        - `[SYSTEM EVENT: pathfinding_result]` - pathing was stopped
-
+        
         Returns:
             dict[str, Any]: Standard success/error result.
         """
-        self._bot.pathfinder.stop()
+        # self._bot.pathfinder.stop() 
+        self._bot.pathfinder.setGoal(None) # force stop immediately,
         # Set state to expect destination event
-        self._state_machine.set_state(self._state_machine.STATE_EXPECT_DESTINATION)
+        # self._state_machine.set_state(self._state_machine.STATE_EXPECT_DESTINATION)
         
         return self._result(True, "Pathing stopped")
 
