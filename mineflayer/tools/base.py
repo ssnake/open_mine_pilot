@@ -6,12 +6,18 @@ pathfinder = require("mineflayer-pathfinder")
 Vec3 = require("vec3").Vec3
 
 class Base:
-    def __init__(self, bot):
-        self._bot = bot
+    def __init__(self, client):
+        self._client = client
+        # Handle cases where just bot is passed for backwards compatibility
+        self._bot = getattr(client, 'bot', client)
         self._bot.loadPlugin(pathfinder.pathfinder)
-        self._mc_data = require("minecraft-data")(bot.version)
+        self._mc_data = require("minecraft-data")(self._bot.version)
         self._movements = pathfinder.Movements(self._bot, self._mc_data)
         self._bot.pathfinder.setMovements(self._movements)
+
+    @property
+    def _state_machine(self):
+        return self._client.agent.state_machine
 
     def _result(self, ok: bool, message: str, **extra: Any) -> dict[str, Any]:
         return {

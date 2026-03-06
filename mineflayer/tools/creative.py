@@ -2,9 +2,9 @@ from javascript import require
 from .base import Base
 
 class CreativeTools(Base):
-    def __init__(self, bot):
-        super().__init__(bot)
-        self._Item = require("prismarine-item")(bot.version)
+    def __init__(self, client):
+        super().__init__(client)
+        self._Item = require("prismarine-item")(self._bot.version)
 
     def set_inventory_slot(self, slot: int, item_name: str, count: int = 1):
         """

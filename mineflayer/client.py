@@ -5,6 +5,7 @@ from .tools import Tools
 from .events import Events
 from agents.base_agent import BaseAgent
 import time
+import queue
 mineflayer = require('mineflayer')
 # run `uv run python3 -m javascript --install canvas` to install canvas
 prismarineViewer   = require("prismarine-viewer")
@@ -20,6 +21,7 @@ class Client:
         self._state = self.STATE_IDLE
         self._username = username
         self._master_username = master_username
+        self._action_queue = queue.Queue()
         self._bot = mineflayer.createBot({ 
           'host': host, 
           'port': port, 
@@ -31,17 +33,25 @@ class Client:
             
         self._set_state(self.STATE_CONNECTING)
         self._init_connect_timer()
-        self._tools = Tools(self._bot)
+        self._tools = Tools(self)
         self._agent = BaseAgent(self)
         self._events = Events(self)
         self._events.bind()
     
+    def whisper(self, username: str, message: str):
+        self._action_queue.put(('whisper', (username, message)))
         
     def run(self):
         try:
             self._log('run')
             while True:
-                time.sleep(0.1)
+                try:
+                    action_type, args = self._action_queue.get(timeout=0.1)
+                    if action_type == 'whisper':
+                        username, message = args
+                        self._bot.whisper(username, message)
+                except queue.Empty:
+                    pass
         except KeyboardInterrupt:
             self._log('KeyboardInterrupt')
             self._set_state(self.STATE_DISCONNECTED)

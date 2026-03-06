@@ -3,8 +3,8 @@ from javascript import require
 from .base import Base
 
 class BasicTools(Base):
-    def __init__(self, bot):
-        super().__init__(bot)
+    def __init__(self, client):
+        super().__init__(client)
 
     def set_gamemode(self, mode: str):
         """

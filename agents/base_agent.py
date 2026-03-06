@@ -8,36 +8,37 @@ import threading
 import queue
 import uuid
 import traceback
+from .state_machine import AgentStateMachine
 
 load_dotenv()
 
 class BaseAgent:
     def __init__(self, client):
         self._client = client
-        self._tools = client.tools 
-        self._init_agents()
-        self._init_session()
-        self._init_runner()    
-        
         self._task_queue = queue.Queue()
-        self._worker_thread = threading.Thread(target=self._process_queue, daemon=True)
-        self._worker_thread.start()
+        self._tools = self._client.tools
+        self.state_machine = AgentStateMachine(agent=self, log_callback=self._log)
 
-    def _process_queue(self):
-        self._log("Background worker thread started.")
+        self._init_session()
+        self._init_agents()
+        self._init_runner()
+        self._thread = threading.Thread(target=self._worker, daemon=True)
+        self._thread.start()
+
+    def _worker(self):
         while True:
-            task = self._task_queue.get()
-            if task is None:
-                break
-            
             try:
+                task = self._task_queue.get()
+                if task is None:
+                    break
+
                 task_type, args = task
                 if task_type == 'chat':
                     self._handle_chat(*args)
                 elif task_type == 'system_event':
                     self._handle_system_event(*args)
             except Exception as e:
-                self._log(f"Error processing task: {e}\n Stack trace: {traceback.format_exc()}")
+                self._log(f"Error processing task: {e}")
             finally:
                 self._task_queue.task_done()
 
@@ -49,12 +50,18 @@ class BaseAgent:
 
     def _handle_chat(self, message: str, trace_id: str):
         result = self.call(message, trace_id)
-        self._client.bot.whisper(self._client._master_username, result)
+        if result:
+            self._client.whisper(self._client._master_username, result)
 
     def _handle_system_event(self, event_name: str, message: str, trace_id: str):
+        # Filter events based on current state using the state machine
+        if not self.state_machine.filter_event(event_name, trace_id):
+            return
+        
         formatted_message = f"[SYSTEM EVENT: {event_name}] {message}"
         result = self.call(formatted_message, trace_id)
-        self._client.bot.whisper(self._client._master_username, result)
+        if result:
+            self._client.whisper(self._client._master_username, result)
 
     def _init_agents(self):
         knowledge = """
@@ -72,19 +79,28 @@ class BaseAgent:
         Skills 
 
         1. Mine a block
+          - make sure following is stopped before start
           - Tools must be called sequentially, one at a time. Call a tool, wait for its result, and only then proceed to the next step.
           - To mine a block, first use `find_blocks` to locate nearby blocks of the desired type.
           - Memorize block name
-          - Use `goto_position` to navigate to the block's location. Wait until you receive `[SYSTEM EVENT: pathfinding_reached_goal]` before proceeding.
+          - Use `goto_position` to navigate to the block's location. Wait until you receive `[SYSTEM EVENT: pathfinding_result]` before proceeding.
           - Once reached, use `start_dig` to begin mining the block.
           - Mining is an asynchronous process. It is considered finished when you receive a game update event of either `diggingCompleted` or `diggingAborted`.
           - When block is finished make sure you mined correct block name
+        2. Pathing
+          - make sure following is stopped before start
+          - if you need to get any position use `async_goto_position`
+          - if you stuck, call `async_stop_pathing` first
+          - if you stuck again, go to random position around you
+        3. Event Timeouts
+          - if an expected asynchronous event takes longer than 60 seconds, you will receive `[SYSTEM EVENT: state_timeout]`
+          - if you receive a timeout, you should evaluate your current situation and retry the action, try a different action, or report the issue to the user.
         """
         self._root_agent = Agent(
             name="main_minecraft_agent",
             # model="gemini-3-flash-preview",
-            # model="gemini-2.5-flash",
-            model="gemini-3.1-flash-lite-preview",
+            model="gemini-2.5-flash",
+            # model="gemini-3.1-flash-lite-preview",
             description="The main coordinator agent. Handles direct question or can delegate to subagents.",
             instruction=f"""
             You are a minecraft agent control a mob in the game. You must execute the master user's orders. You can use tools to interact with the game.

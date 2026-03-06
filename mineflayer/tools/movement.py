@@ -7,8 +7,8 @@ pathfinder = require("mineflayer-pathfinder")
 Vec3 = require("vec3").Vec3
 
 class MovementTools(Base):
-    def __init__(self, bot):
-        super().__init__(bot)
+    def __init__(self, client):
+        super().__init__(client)
         self._follow_master = None
         
     def available_methods(self):
@@ -17,7 +17,7 @@ class MovementTools(Base):
             "get_my_orientation",
             "set_my_orientation",
             "async_goto_position",
-            "stop_pathing",
+            "async_stop_pathing",
             "get_player_position",
             "follow_player",
             "stop_following",
@@ -99,31 +99,35 @@ class MovementTools(Base):
             pitch=float(pitch),
         )
 
-    def stop_pathing(self) -> dict[str, Any]:
+    def async_stop_pathing(self) -> dict[str, Any]:
         """
         Stop the current pathfinding action immediately.
+        This is an asynchronous operation. This tool call must be final. 
+        Once is called expect following event from system:
+        - `[SYSTEM EVENT: pathfinding_result]` - pathing was stopped
 
         Returns:
             dict[str, Any]: Standard success/error result.
         """
         self._bot.pathfinder.stop()
+        # Set state to expect destination event
+        self._state_machine.set_state(self._state_machine.STATE_EXPECT_DESTINATION)
+        
         return self._result(True, "Pathing stopped")
 
     def async_goto_position(self, x: int, y: int, z: int, radius: int = 1) -> dict[str, Any]:
         """
         Navigate near an absolute block position. 
         This is an asynchronous operation. This tool call must be final. 
-        Once is called expect following events from system:
-        - `[SYSTEM EVENT: destination_reached]` - if you reach the destination successfully
-        - `[SYSTEM EVENT: destination_path_timeout]` - if pathing timed out
-        - `[SYSTEM EVENT: destination_path]` - if no path found
+        Once is called expect following event from system:
+        - `[SYSTEM EVENT: pathfinding_result]` - Will contain message indicating success or failure (timeout, no path, etc.)
 
         Args:
             x (int): Target X coordinate.
             y (int): Target Y coordinate.
             z (int): Target Z coordinate.
             radius (int, optional): Acceptable distance from target. Defaults to 1.
-
+        
         Returns:
             dict[str, Any]: Standard success/error result with target and radius.
         """
@@ -131,6 +135,10 @@ class MovementTools(Base):
         target = Vec3(int(x), int(y), int(z))
         goal = pathfinder.goals.GoalNear(target.x, target.y, target.z, int(radius))
         self._bot.pathfinder.setGoal(goal)
+        
+        # Set state to expect destination event
+        self._state_machine.set_state(self._state_machine.STATE_EXPECT_DESTINATION)
+        
         return self._result(True, "Goal target is set successfully. You're on the way!", target=self._pos_to_dict(target), radius=int(radius))
 
     def follow_player(self, username: str, distance: int = 2) -> dict[str, Any]:

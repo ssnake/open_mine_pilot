@@ -3,8 +3,8 @@ from .base import Base
 from javascript import require
 
 class MineTool(Base):
-    def __init__(self, bot):
-        super().__init__(bot)
+    def __init__(self, client):
+        super().__init__(client)
         self._targetDigBlock = None
     
     def dig_time(self, x: int, y: int, z: int) -> dict[str, Any]:
@@ -34,7 +34,9 @@ class MineTool(Base):
     def async_start_dig(self, x: int, y: int, z: int) -> dict[str, Any]:
         """
         Starts digging a block at the given coordinates.
-        This is an asynchronous operation. You MUST WAIT for a `[SYSTEM EVENT: diggingCompleted]` or `[SYSTEM EVENT: diggingAborted]` before taking your next action. Do not call any other tools until you receive this event.
+        This is an asynchronous operation. 
+        You MUST WAIT for a `[SYSTEM EVENT: diggingCompleted]` or `[SYSTEM EVENT: diggingAborted]` before taking your next action. 
+        Do not call any other tools until you receive this event.
         
         Args:
             x (int): X coordinate of the block to dig.
@@ -59,11 +61,14 @@ class MineTool(Base):
         try:
             # We don't await this as it's meant to be an ongoing action
             # The completion will be handled by events
-            self._targetDigBlock = block
             self._bot.dig(block)
+            self._targetDigBlock = block
+            
+            # Set state to expect digging event
+            self._state_machine.set_state(self._state_machine.STATE_EXPECT_DIGGING)
+            
             return self._result(True, f"Started digging block `{block.name}`")
         except Exception as e:
-            self._targetDigBlock = None
             return self._result(False, f"Failed to start digging: {str(e)}")
 
     def stop_dig(self) -> dict[str, Any]:
@@ -77,7 +82,9 @@ class MineTool(Base):
             return self._result(False, "Not currently digging any block.")
             
         self._bot.stopDigging()
-        return self._result(True, f"Stopped digging block `{self._targetDigBlock.name}`")
+        self._targetDigBlock = None
+        return self._result(True, f"Stopped digging block")
+
 
     def available_methods(self):
         return [self.async_start_dig, self.stop_dig, self.dig_time]

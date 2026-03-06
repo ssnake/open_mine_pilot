@@ -2,8 +2,8 @@ from typing import Any
 from .base import Base
 
 class InventoryTools(Base):
-    def __init__(self, bot):
-        super().__init__(bot)
+    def __init__(self, client):
+        super().__init__(client)
 
     def available_methods(self):
         method_names = [
