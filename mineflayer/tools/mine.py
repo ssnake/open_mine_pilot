@@ -1,6 +1,6 @@
 from typing import Any
 from .base import Base
-from javascript import require
+from javascript import require, AsyncTask
 
 class MineTool(Base):
     def __init__(self, client):
@@ -55,19 +55,39 @@ class MineTool(Base):
         if getattr(block, 'name', '') == 'air':
             return self._result(False, "The block at the given coordinates is 'air'. You cannot dig air.")
 
+        if getattr(block, 'name', '') in ['water', 'lava']:
+            return self._result(False, f"The block is a liquid ({block.name}). You cannot dig liquids.")
+
+        # Check reachability
+        bot_pos = self._bot.entity.position
+        distance = bot_pos.distanceTo(target_pos)
+        if distance > 5:
+            return self._result(False, f"Block is too far away ({distance:.1f} blocks). You must move closer first (within 5 blocks).")
+
+        # Check if block is diggable
+        if not self._bot.canDigBlock(block):
+            return self._result(False, f"Cannot dig block '{block.name}'. You might need a specific tool or it is indestructible.")
+
         if self._targetDigBlock:
             return self._result(False, "Already digging another block. Call stop_dig first.")
 
         try:
-            # We don't await this as it's meant to be an ongoing action
-            # The completion will be handled by events
-            self._bot.dig(block)
+            # bot.dig returns a Promise in JS. We must run it as an AsyncTask 
+            # so JSPyBridge doesn't block the Python main thread waiting for it.
+            # If it blocks, diggingCompleted/diggingAborted events will never fire.
+            @AsyncTask(start=True)
+            def do_dig(task):
+                try:
+                    self._bot.dig(block)
+                except Exception as e:
+                    print(f"Error during async dig: {e}")
+            
             self._targetDigBlock = block
             
             # Set state to expect digging event
             self._state_machine.set_state(self._state_machine.STATE_EXPECT_DIGGING)
             
-            return self._result(True, f"Started digging block `{block.name}`")
+            return self._result(True, f"Started digging block '{block.name}' at {x}, {y}, {z}")
         except Exception as e:
             return self._result(False, f"Failed to start digging: {str(e)}")
 

@@ -5,7 +5,8 @@ class MineEvents(Base):
     def bind(self):
         @On(self._bot, 'diggingCompleted')
         def on_digging_completed(this, block):
-            msg = f'Finished digging block at {block.position.x}, {block.position.y}, {block.position.z}'
+            block_name = getattr(block, 'name', 'unknown')
+            msg = f'Finished digging block {block_name} at {block.position.x}, {block.position.y}, {block.position.z}'
             trace_id = self.trace_id()
             self._log(msg, trace_id)
             self._client.tools._mine_tool._targetDigBlock = None
@@ -14,7 +15,8 @@ class MineEvents(Base):
 
         @On(self._bot, 'diggingAborted')
         def on_digging_aborted(this, block):
-            msg = f'Digging aborted for block at {block.position.x}, {block.position.y}, {block.position.z}'
+            block_name = getattr(block, 'name', 'unknown')
+            msg = f'Digging aborted for block {block_name} at {block.position.x}, {block.position.y}, {block.position.z}'
             trace_id = self.trace_id()
             self._log(msg, trace_id)
             self._client.tools._mine_tool._targetDigBlock = None

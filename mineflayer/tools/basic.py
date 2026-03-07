@@ -117,11 +117,72 @@ class BasicTools(Base):
         except Exception as e:
             return self._result(False, f"Failed to find blocks: {e}")
 
+    def get_voxel_map(self, radius: int = 5, y_range: int = 3) -> dict:
+        """
+        Get a sparse voxel map of blocks around the bot.
+        Returns a dictionary mapping relative coordinates "dx,dy,dz" to block names.
+        (0,0,0) is the bot's current position block.
+        Air blocks are omitted to save space.
+
+        Args:
+            radius (int, optional): The horizontal radius to search. Defaults to 5.
+            y_range (int, optional): The vertical range (up and down). Defaults to 3.
+
+        Returns:
+            dict: Status of the operation and the voxel map.
+        """
+        try:
+            bot_pos = self._bot.entity.position
+            base_x = int(bot_pos.x)
+            base_y = int(bot_pos.y)
+            base_z = int(bot_pos.z)
+            
+            voxel_map = {}
+            
+            # Iterate through coordinates around the bot
+            for dy in range(-y_range, y_range + 1):
+                for dx in range(-radius, radius + 1):
+                    for dz in range(-radius, radius + 1):
+                        target_pos = self._to_vec3({'x': base_x + dx, 'y': base_y + dy, 'z': base_z + dz})
+                        block = self._bot.blockAt(target_pos)
+                        
+                        if block and block.name != "air" and block.name != "cave_air":
+                            voxel_map[f"{dx},{dy},{dz}"] = block.name
+
+            return self._result(True, "Successfully generated voxel map", voxel_map=voxel_map)
+        except Exception as e:
+            return self._result(False, f"Failed to get voxel map: {e}")
+
+    def can_dig_block(self, x: int, y: int, z: int) -> dict:
+        """
+        Check if a block at specific coordinates is diggable and within range.
+        
+        Args:
+            x (int): X coordinate of the block.
+            y (int): Y coordinate of the block.
+            z (int): Z coordinate of the block.
+            
+        Returns:
+            dict: Status of the operation with a boolean indicating if block can be dug.
+        """
+        try:
+            target_pos = self._to_vec3({'x': x, 'y': y, 'z': z})
+            block = self._bot.blockAt(target_pos)
+            if not block:
+                return self._result(False, "No block found at given coordinates")
+            
+            can_dig = self._bot.canDigBlock(block)
+            return self._result(can_dig, f"Can dig block {block.name}")
+        except Exception as e:
+            return self._result(False, f"Failed to check if block is diggable: {e}")
+
     def available_methods(self):
         return [
             self.set_gamemode,
             self.get_gamemode,
             self.set_quick_bar_slot,
             self.can_see_block,
-            self.find_blocks
+            self.find_blocks,
+            self.get_voxel_map,
+            self.can_dig_block
         ]

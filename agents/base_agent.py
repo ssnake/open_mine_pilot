@@ -43,14 +43,16 @@ class BaseAgent:
           - Tools must be called sequentially, one at a time. Call a tool, wait for its result, and only then proceed to the next step.
           - To mine a block, first use `find_blocks` to locate nearby blocks of the desired type.
           - Memorize block name
-          - if you're next to the block, use `start_dig` to begin mining the block.
-          - if needed use `goto_position` to navigate to the block's location. Wait until you receive `[SYSTEM EVENT: pathfinding_result]` before proceeding.
-          - Once you are at the block's location, use `start_dig` to begin mining the block.
+          - if you're next to the block (within 4 blocks), use `async_start_dig` to begin mining the block.
+          - if you need to move to the block to mine it, use `async_goto_block` (NOT `async_goto_position`) to navigate to the block's location. Wait until you receive `[SYSTEM EVENT: pathfinding_result]` before proceeding.
+          - Once you receive the pathfinding success event, use `async_start_dig` to begin mining the block.
           - Mining is an asynchronous process. It is considered finished when you receive a game update event of either `diggingCompleted` or `diggingAborted`.
           - When block is finished make sure you mined correct block name
+          - Make sure you grab blocks from the ground after mining
         2. Pathing
           - make sure following is stopped before start
-          - if you need to get any position use `async_goto_position`
+          - if you need to go to a general coordinate use `async_goto_position`
+          - if you need to go to a specific solid block to mine/interact with it, use `async_goto_block`
           - if you stuck again, go to random position around you
         3. Event Timeouts
           - if an expected asynchronous event takes longer than 60 seconds, you will receive `[SYSTEM EVENT: state_timeout]`
@@ -59,8 +61,8 @@ class BaseAgent:
         self._root_agent = Agent(
             name="main_minecraft_agent",
             # model="gemini-3-flash-preview",
-            model="gemini-2.5-flash",
-            # model="gemini-3.1-flash-lite-preview",
+            # model="gemini-2.5-flash",
+            model="gemini-3.1-flash-lite-preview",
             description="The main coordinator agent. Handles direct question or can delegate to subagents.",
             instruction=f"""
             You are a minecraft agent control a mob in the game. You must execute the master user's orders. You can use tools to interact with the game.

@@ -22,9 +22,11 @@ class PathfindingEvents(Base):
             # self._log(msg, trace_id)
             if status == 'timeout':
                 self._log(msg, trace_id)
+                self._client.bot.pathfinder.setGoal(None)
                 self._client.action_processor.enqueue_system_event('pathfinding_result', 'error: Pathing timed out', trace_id)
             if status == 'noPath':
                 self._log(msg, trace_id)
+                self._client.bot.pathfinder.setGoal(None)
                 self._client.action_processor.enqueue_system_event('pathfinding_result', 'error: No path found', trace_id)
                 
         @On(self._bot, 'path_reset')
@@ -33,6 +35,7 @@ class PathfindingEvents(Base):
             msg = f'path reset: {reason}'
             self._log(msg, trace_id)
             if reason == 'stuck':
+                self._client.bot.pathfinder.setGoal(None)
                 self._client.action_processor.enqueue_system_event('pathfinding_result', 'error: Mob is stuck', trace_id)
             # self._agent.enqueue_system_event('path_reset', f"Mob is on the path, but path was reset because of reason: {reason}", trace_id)
 

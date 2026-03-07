@@ -17,6 +17,7 @@ class MovementTools(Base):
             "get_my_orientation",
             "set_my_orientation",
             "async_goto_position",
+            "async_goto_block",
             "stop_pathing",
             "get_player_position",
             "follow_player",
@@ -120,11 +121,15 @@ class MovementTools(Base):
         Once is called expect following event from system:
         - `[SYSTEM EVENT: pathfinding_result]` - Will contain message indicating success or failure (timeout, no path, etc.)
 
+        Note: If you are navigating to a solid block (like to mine it), it is highly recommended to use a radius of 3 or 4,
+        because the bot cannot stand inside a solid block and will get stuck trying to reach it with radius=1.
+        Alternatively, use `async_goto_block` which is specifically designed for reaching blocks to interact with them.
+
         Args:
             x (int): Target X coordinate.
             y (int): Target Y coordinate.
             z (int): Target Z coordinate.
-            radius (int, optional): Acceptable distance from target. Defaults to 1.
+            radius (int, optional): Acceptable distance from target. Defaults to 1. Use larger radius (3-4) for interacting with solid blocks.
         
         Returns:
             dict[str, Any]: Standard success/error result with target and radius.
@@ -137,7 +142,35 @@ class MovementTools(Base):
         # Set state to expect destination event
         self._state_machine.set_state(self._state_machine.STATE_EXPECT_DESTINATION)
         
-        return self._result(True, "Goal target is set successfully. You're on the way!", target=self._pos_to_dict(target), radius=int(radius))
+        return self._result(True, f"Goal target is set successfully. You're on the way! (Radius: {radius})", target=self._pos_to_dict(target), radius=int(radius))
+
+    def async_goto_block(self, x: int, y: int, z: int) -> dict[str, Any]:
+        """
+        Navigate to a position where you can break/interact with the specified block.
+        This is much more reliable than `async_goto_position` when you want to mine a block, 
+        as it ensures you get close enough to reach it without trying to stand inside it.
+        
+        This is an asynchronous operation. This tool call must be final. 
+        Once is called expect following event from system:
+        - `[SYSTEM EVENT: pathfinding_result]` - Will contain message indicating success or failure (timeout, no path, etc.)
+
+        Args:
+            x (int): Target block X coordinate.
+            y (int): Target block Y coordinate.
+            z (int): Target block Z coordinate.
+        
+        Returns:
+            dict[str, Any]: Standard success/error result.
+        """
+        
+        target = Vec3(int(x), int(y), int(z))
+        goal = pathfinder.goals.GoalLookAtBlock(target, self._bot.world)
+        self._bot.pathfinder.setGoal(goal)
+        
+        # Set state to expect destination event
+        self._state_machine.set_state(self._state_machine.STATE_EXPECT_DESTINATION)
+        
+        return self._result(True, "Goal target set successfully. You are moving into range to interact with the block.", target={"x": x, "y": y, "z": z})
 
     def follow_player(self, username: str, distance: int = 2) -> dict[str, Any]:
         """
