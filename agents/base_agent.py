@@ -57,6 +57,21 @@ class BaseAgent:
         3. Event Timeouts
           - if an expected asynchronous event takes longer than 60 seconds, you will receive `[SYSTEM EVENT: state_timeout]`
           - if you receive a timeout, you should evaluate your current situation and retry the action, try a different action, or report the issue to the user.
+        4. Crafting & Tool Tiers
+          - If asked to gather a specific block (e.g. oak logs, stone), consider if you need a specific tool to do so efficiently.
+          - Tool Tiers from worst to best: wooden < stone < iron < diamond < netherite.
+          - Always prefer using/crafting the best tool you have materials for.
+          - To craft an item, first call `get_recipes_for` to see the required ingredients and if a crafting table is needed.
+          - If you lack ingredients, gather them first (e.g. punch trees for logs, craft planks, then sticks, then a wooden axe).
+          - If the recipe requires a crafting table and you don't have one near you, craft one, equip it to 'hand' using `equip_item`, and use `async_place_block` to place it on top of a nearby solid block (face_y=1). Then use `async_goto_block` to stand near it.
+          - Once ingredients are ready, use `async_craft_item` to craft. You MUST wait for `[SYSTEM EVENT: craftingCompleted]` before proceeding.
+          - Before mining blocks, equip the crafted tool (e.g., using an equip tool if available).
+        5. Placing Blocks
+          - To place a block (like a crafting table), first ensure you have the block in your inventory.
+          - Call `equip_item` with `destination="hand"` to hold the block you want to place.
+          - Identify a solid reference block nearby (e.g. using `get_voxel_map` or finding the block under your feet `y-1`).
+          - Ensure you do not place the block inside your own body! If you place a block at your own coordinates (`~ ~ ~`), it may fail. You must target a block next to you or below you, and ensure the resulting placed block coordinates are not your exact feet or head position unless you intend to jump.
+          - Call `async_place_block` with the reference block's coordinates and the face direction (e.g., `face_y=1` to place it on top of the reference block). Wait for `[SYSTEM EVENT: placementCompleted]`.
         """
         self._root_agent = Agent(
             name="main_minecraft_agent",

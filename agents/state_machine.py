@@ -6,6 +6,8 @@ class AgentStateMachine:
     STATE_EXPECT_DESTINATION = 'expect_destination'
     STATE_EXPECT_DIGGING = 'expect_digging'
     STATE_EXPECT_COLLECTION = 'expect_collection'
+    STATE_EXPECT_CRAFTING = 'expect_crafting'
+    STATE_EXPECT_PLACEMENT = 'expect_placement'
 
     def __init__(self, agent=None, log_callback=None):
         self._state = self.STATE_IDLE
@@ -82,6 +84,24 @@ class AgentStateMachine:
             if event_name not in ('collectionCompleted', 'collectionAborted'):
                 if self._log_callback:
                     self._log_callback(f"Ignoring noise event {event_name} while expecting collection completion", trace_id)
+                return False
+            # Reset state on relevant event
+            self.set_state(self.STATE_IDLE)
+            return True
+            
+        elif self._state == self.STATE_EXPECT_CRAFTING:
+            if event_name not in ('craftingCompleted', 'craftingAborted'):
+                if self._log_callback:
+                    self._log_callback(f"Ignoring noise event {event_name} while expecting crafting completion", trace_id)
+                return False
+            # Reset state on relevant event
+            self.set_state(self.STATE_IDLE)
+            return True
+            
+        elif self._state == self.STATE_EXPECT_PLACEMENT:
+            if event_name not in ('placementCompleted', 'placementAborted'):
+                if self._log_callback:
+                    self._log_callback(f"Ignoring noise event {event_name} while expecting placement completion", trace_id)
                 return False
             # Reset state on relevant event
             self.set_state(self.STATE_IDLE)

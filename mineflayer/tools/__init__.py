@@ -6,6 +6,8 @@ from .creative import CreativeTools
 from .basic import BasicTools
 from .mine import MineTool
 from .collect import CollectTool
+from .crafting import CraftingTool
+from .building import BuildingTool
 
 class Tools:
     def __init__(self, client):
@@ -18,6 +20,8 @@ class Tools:
         self._basic_tools = BasicTools(client)
         self._mine_tool = MineTool(client)
         self._collect_tool = CollectTool(client)
+        self._crafting_tool = CraftingTool(client)
+        self._building_tool = BuildingTool(client)
 
     def available_methods(self):
-        return self._movement_tools.available_methods() + self._inventory_tools.available_methods() + self._creative_tools.available_methods() + self._basic_tools.available_methods() + self._mine_tool.available_methods() + self._collect_tool.available_methods()
+        return self._movement_tools.available_methods() + self._inventory_tools.available_methods() + self._creative_tools.available_methods() + self._basic_tools.available_methods() + self._mine_tool.available_methods() + self._collect_tool.available_methods() + self._crafting_tool.available_methods() + self._building_tool.available_methods()
