@@ -23,65 +23,28 @@ class BaseAgent:
         self._init_agents()
         self._init_runner()
 
+    def _get_knowledge(self):
+        knowledge_path = os.path.join(os.path.dirname(__file__), "knowledge.md")
+        try:
+            with open(knowledge_path, "r", encoding="utf-8") as f:
+                return f.read()
+        except FileNotFoundError:
+            return ""
+
+    def _get_skills(self):
+        import glob
+        skills_dir = os.path.join(os.path.dirname(__file__), "skills")
+        skills = "Skills\n\n"
+        if os.path.exists(skills_dir):
+            for skill_file in sorted(glob.glob(os.path.join(skills_dir, "*.md"))):
+                with open(skill_file, "r", encoding="utf-8") as f:
+                    skills += f.read() + "\n\n"
+        return skills
+
     def _init_agents(self):
-        knowledge = """
-        Knowledge about the Minecraft world:
-        - Items and blocks in Minecraft are usually prefixed with 'minecraft:'. For example: 'minecraft:diamond_helmet', 'minecraft:iron_pickaxe', 'minecraft:dirt', etc.
-        - When looking for a generic block type like "any log", you should provide all variations to `find_blocks` (e.g. `['oak_log', 'birch_log', 'spruce_log', 'jungle_log', 'acacia_log', 'dark_oak_log', 'mangrove_log', 'cherry_log']`).
-        - Tool call that are waiting for event response must be with "finishReason": "STOP"
-        - You must use only one tool call at a time.
-        - Do not call another tool until you receive a response from the current tool.
-        - When async tool is called do not call another tool
+        knowledge = self._get_knowledge()
+        skills = self._get_skills()
 
-        You language to speak with master is ukranian
-        
-        """
-
-        skills = """
-        Skills 
-
-        1. Mine a block
-          - make sure following is stopped before start
-          - Tools must be called sequentially, one at a time. Call a tool, wait for its result, and only then proceed to the next step.
-          - To mine a block, first use `find_blocks` to locate nearby blocks of the desired type.
-          - Memorize block name
-          - BEFORE mining, check your inventory and equip the appropriate tool using `equip_item` with `destination="hand"`. 
-            - For wood/logs, equip an axe.
-            - For stone/ores, equip a pickaxe.
-            - For dirt/sand/gravel, equip a shovel.
-            - If you don't have the appropriate tool, consider crafting one first (see Crafting & Tool Tiers).
-          - if you're next to the block (within 4 blocks), use `async_start_dig` to begin mining the block.
-          - if you need to move to the block to mine it, use `async_goto_block` (NOT `async_goto_position`) to navigate to the block's location. Wait until you receive `[SYSTEM EVENT: pathfinding_result]` before proceeding.
-          - Once you receive the pathfinding success event, use `async_start_dig` to begin mining the block.
-          - Mining is an asynchronous process. It is considered finished when you receive a game update event of either `diggingCompleted` or `diggingAborted`.
-          - When block is finished make sure you mined correct block name
-          - Make sure you grab blocks from the ground after mining
-        2. Pathing
-          - make sure following is stopped before start
-          - if you need to go to a general coordinate use `async_goto_position`
-          - if you need to go to a specific solid block to mine/interact with it, use `async_goto_block`
-          - if you stuck again, go to random position around you
-        3. Event Timeouts
-          - if an expected asynchronous event takes longer than 60 seconds, you will receive `[SYSTEM EVENT: state_timeout]`
-          - if you receive a timeout, you should evaluate your current situation and retry the action, try a different action, or report the issue to the user.
-        4. Crafting & Tool Tiers
-          - If asked to gather a specific block (e.g. oak logs, stone), consider if you need a specific tool to do so efficiently.
-          - Tool Tiers from worst to best: wooden < stone < iron < diamond < netherite.
-          - Always prefer using/crafting the best tool you have materials for.
-          - To craft an item, first call `get_recipes_for` to see the required ingredients and if a crafting table is needed.
-          - If you lack ingredients, gather them first (e.g. punch trees for logs, craft planks, then sticks, then a wooden axe).
-          - If the recipe requires a crafting table, FIRST check if there is already one nearby using `find_blocks` with `matching='crafting_table'`. 
-            - If you find one nearby, go to it using `async_goto_block`.
-            - ONLY if you don't find one, you should gather ingredients, craft one, equip it to 'hand' using `equip_item`, use `async_place_block` to place it on top of a nearby solid block (face_y=1), and then use `async_goto_block` to stand near it.
-          - Once ingredients are ready and you are near a crafting table (if required), use `async_craft_item` to craft. You MUST wait for `[SYSTEM EVENT: craftingCompleted]` before proceeding.
-          - Before mining blocks, equip the crafted tool (e.g., using an equip tool if available).
-        5. Placing Blocks
-          - To place a block (like a crafting table), first ensure you have the block in your inventory.
-          - Call `equip_item` with `destination="hand"` to hold the block you want to place.
-          - Identify a solid reference block nearby (e.g. using `get_voxel_map` or finding the block under your feet `y-1`).
-          - Ensure you do not place the block inside your own body! If you place a block at your own coordinates (`~ ~ ~`), it may fail. You must target a block next to you or below you, and ensure the resulting placed block coordinates are not your exact feet or head position unless you intend to jump.
-          - Call `async_place_block` with the reference block's coordinates and the face direction (e.g., `face_y=1` to place it on top of the reference block). Wait for `[SYSTEM EVENT: placementCompleted]`.
-        """
         self._root_agent = Agent(
             name="main_minecraft_agent",
             # model="gemini-3-flash-preview",
