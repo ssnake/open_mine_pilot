@@ -32,6 +32,8 @@ class BaseAgent:
         - You must use only one tool call at a time.
         - Do not call another tool until you receive a response from the current tool.
         - When async tool is called do not call another tool
+
+        You language to speak with master is ukranian
         
         """
 
@@ -43,6 +45,11 @@ class BaseAgent:
           - Tools must be called sequentially, one at a time. Call a tool, wait for its result, and only then proceed to the next step.
           - To mine a block, first use `find_blocks` to locate nearby blocks of the desired type.
           - Memorize block name
+          - BEFORE mining, check your inventory and equip the appropriate tool using `equip_item` with `destination="hand"`. 
+            - For wood/logs, equip an axe.
+            - For stone/ores, equip a pickaxe.
+            - For dirt/sand/gravel, equip a shovel.
+            - If you don't have the appropriate tool, consider crafting one first (see Crafting & Tool Tiers).
           - if you're next to the block (within 4 blocks), use `async_start_dig` to begin mining the block.
           - if you need to move to the block to mine it, use `async_goto_block` (NOT `async_goto_position`) to navigate to the block's location. Wait until you receive `[SYSTEM EVENT: pathfinding_result]` before proceeding.
           - Once you receive the pathfinding success event, use `async_start_dig` to begin mining the block.
@@ -63,8 +70,10 @@ class BaseAgent:
           - Always prefer using/crafting the best tool you have materials for.
           - To craft an item, first call `get_recipes_for` to see the required ingredients and if a crafting table is needed.
           - If you lack ingredients, gather them first (e.g. punch trees for logs, craft planks, then sticks, then a wooden axe).
-          - If the recipe requires a crafting table and you don't have one near you, craft one, equip it to 'hand' using `equip_item`, and use `async_place_block` to place it on top of a nearby solid block (face_y=1). Then use `async_goto_block` to stand near it.
-          - Once ingredients are ready, use `async_craft_item` to craft. You MUST wait for `[SYSTEM EVENT: craftingCompleted]` before proceeding.
+          - If the recipe requires a crafting table, FIRST check if there is already one nearby using `find_blocks` with `matching='crafting_table'`. 
+            - If you find one nearby, go to it using `async_goto_block`.
+            - ONLY if you don't find one, you should gather ingredients, craft one, equip it to 'hand' using `equip_item`, use `async_place_block` to place it on top of a nearby solid block (face_y=1), and then use `async_goto_block` to stand near it.
+          - Once ingredients are ready and you are near a crafting table (if required), use `async_craft_item` to craft. You MUST wait for `[SYSTEM EVENT: craftingCompleted]` before proceeding.
           - Before mining blocks, equip the crafted tool (e.g., using an equip tool if available).
         5. Placing Blocks
           - To place a block (like a crafting table), first ensure you have the block in your inventory.
@@ -80,9 +89,15 @@ class BaseAgent:
             model="gemini-3.1-flash-lite-preview",
             description="The main coordinator agent. Handles direct question or can delegate to subagents.",
             instruction=f"""
-            You are a minecraft agent control a mob in the game. You must execute the master user's orders. You can use tools to interact with the game.
+            You are an autonomous Minecraft agent controlling a mob in the game. You must execute the master user's orders efficiently and independently. You can use tools to interact with the game.
             
-            You master username is {self._client._master_username}
+            CRITICAL AUTONOMY RULES:
+            - Do NOT ask the master for permission or confirmation to take intermediate steps. 
+            - If you need a tool, craft it. If you need materials, gather them. Take initiative.
+            - Do NOT ask the master what to do next if you are in the middle of completing a complex task.
+            - Only speak to the master when you have fully completed their request, or if you are completely and unrecoverably stuck.
+            
+            Your master username is {self._client._master_username}
             
             {knowledge}
             {skills}
@@ -128,20 +143,28 @@ class BaseAgent:
         final_response_text = ""
         content = types.Content(role='user', parts=[types.Part(text=message)])
         
-        async for event in self._runner.run_async(user_id=self._USER_ID, session_id=self._SESSION_ID, new_message=content):
-            self._debug_event(event, trace_id)
+        try:
+            async for event in self._runner.run_async(user_id=self._USER_ID, session_id=self._SESSION_ID, new_message=content):
+                self._debug_event(event, trace_id)
 
-            if event.is_final_response():          
-                if event.content and event.content.parts:
-                    # Assuming text response in the first part
-                    final_response_text = event.content.parts[0].text
-                elif event.actions and event.actions.escalate: # Handle potential errors/escalations
-                    final_response_text = f"Agent escalated: {event.error_message or 'No specific message.'}"
-                break # Stop processing events once the final response is found
+                if event.is_final_response():          
+                    if event.content and event.content.parts:
+                        # Assuming text response in the first part
+                        final_response_text = event.content.parts[0].text
+                    elif event.actions and event.actions.escalate: # Handle potential errors/escalations
+                        final_response_text = f"Agent escalated: {event.error_message or 'No specific message.'}"
+                    break # Stop processing events once the final response is found
 
-            if self._is_async_function_successful_response(event):
-                self._log(f'[call]: Async function success response received', trace_id)
-                break
+                if self._is_async_function_successful_response(event):
+                    self._log(f'[call]: Async function success response received', trace_id)
+                    break
+        except Exception as e:
+            self._log(f'[Error]: LLM provider error or internal failure: {str(e)}', trace_id)
+            # You can also use traceback.print_exc() if you need more details in the logs.
+            if self.state_machine.state != self.state_machine.STATE_IDLE:
+                self._log(f'[Warning]: Resetting state machine from {self.state_machine.state} to idle due to error', trace_id)
+                self.state_machine.set_state(self.state_machine.STATE_IDLE)
+            final_response_text = f"Agent encountered an internal error: {str(e)}"
 
         return final_response_text      
 

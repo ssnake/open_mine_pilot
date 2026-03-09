@@ -78,9 +78,16 @@ class MineTool(Base):
             @AsyncTask(start=True)
             def do_dig(task):
                 try:
-                    self._bot.dig(block)
+                    # Provide a long timeout (e.g. 100 seconds) so the JSPyBridge does not timeout internally.
+                    # Mining obsidian takes a long time, and the bridge default timeout is 10s.
+                    self._bot.dig(block, timeout=100)
                 except Exception as e:
                     print(f"Error during async dig: {e}")
+                    self._client.action_processor.enqueue_system_event(
+                        'diggingAborted', 
+                        f"Digging failed due to error: {str(e)}", 
+                        self._state_machine._agent.get_active_trace_id() if hasattr(self._state_machine, '_agent') and hasattr(self._state_machine._agent, 'get_active_trace_id') else "system"
+                    )
             
             self._targetDigBlock = block
             

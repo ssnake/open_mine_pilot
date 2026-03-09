@@ -106,7 +106,7 @@ class CraftingTool(Base):
         @AsyncTask(start=True)
         def do_craft(task):
             try:
-                self._bot.craft(recipe_to_use, count, table_block)
+                self._bot.craft(recipe_to_use, count, table_block, timeout=100)
                 
                 self._client.action_processor.enqueue_system_event(
                     'craftingCompleted', 

@@ -55,7 +55,8 @@ class BuildingTool(Base):
                 # We need to ensure the bot isn't trying to place the block inside itself
                 # Mineflayer might time out waiting for blockUpdate if the placement is invalid or server ignores it.
                 # It throws a JavaScriptError which gets cast to string in Python.
-                self._bot.placeBlock(reference_block, face_vector)
+                # We set a large bridge timeout to avoid Python event loop breaking if it hangs.
+                self._bot.placeBlock(reference_block, face_vector, timeout=100)
                 
                 self._client.action_processor.enqueue_system_event(
                     'placementCompleted', 

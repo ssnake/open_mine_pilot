@@ -44,3 +44,24 @@ The project is managed with `uv`.
 ```bash
 uv run main.py
 ```
+
+## Development Knowledge & Best Practices
+
+### Asynchronous Tools (Mineflayer & JSPyBridge)
+When defining asynchronous tools for the Mineflayer bot (like digging, picking up items, crafting, or placing blocks):
+- Always use `@javascript.AsyncTask(start=True)` to wrap the Node.js API calls to prevent blocking the Python main thread.
+- Always emit a `[SYSTEM EVENT: <event_name>]` via the action processor upon completion or failure.
+- Add a corresponding expectation state (e.g., `STATE_EXPECT_PLACEMENT`) to the `AgentStateMachine` to handle these events and filter noise.
+- Explicitly document in the tool docstring that the agent must wait for the system event before taking another action.
+
+### Handling JavaScript Arrays in Python (JSPyBridge)
+When calling Mineflayer/Node.js functions that return arrays (like `.recipesFor()` or `bot.inventory.items()`), they are often returned as `javascript.proxy.Proxy` objects in Python.
+- Python's `len()` function **cannot** be used on these objects. It will throw a `TypeError`.
+- Instead, use `getattr(proxy_object, 'length', 0)` to securely find the array's length.
+- Access elements via string indexes rather than integer indexes, for example: `proxy_object[str(i)]`.
+
+### Block Placement & Timeouts
+- When using Mineflayer's `bot.placeBlock()`, the method waits for a `blockUpdate` event from the Minecraft server to confirm successful placement.
+- If the bot attempts to place a block inside its own collision box (e.g., at its exact feet coordinates without jumping), the server will silently reject it. Mineflayer will then hang for 5000ms until it throws a timeout error (`Event blockUpdate:... did not fire within timeout`).
+- Tools must enforce distance checks (`bot.entity.position.distanceTo(target_pos)`) to ensure the placement target isn't too far (>5 blocks) or too close (inside the bot's bounding box).
+- Catching Promise timeout errors natively across JSPyBridge inside an `AsyncTask` requires checking if the stringified Python exception (`str(e)`) contains specific phrases like `'did not fire within timeout'`.

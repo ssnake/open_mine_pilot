@@ -18,10 +18,11 @@ class Client:
     STATE_CONNECTED = 'connected'
     STATE_DISCONNECTED = 'disconnected'
     
-    def __init__(self, host: str, port: int, username: str, master_username: str):
+    def __init__(self, host: str, port: int, username: str, master_username: str, use_say_for_chat: bool = False):
         self._state = self.STATE_IDLE
         self._username = username
         self._master_username = master_username
+        self.use_say_for_chat = use_say_for_chat
         self.action_processor = ActionProcessor(self)
         self._bot = mineflayer.createBot({ 
           'host': host, 
