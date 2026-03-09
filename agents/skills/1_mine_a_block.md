@@ -3,14 +3,14 @@
 - Tools must be called sequentially, one at a time. Call a tool, wait for its result, and only then proceed to the next step.
 - To mine a block, first use `find_blocks` to locate nearby blocks of the desired type.
 - Memorize block name
-- BEFORE mining, check your inventory and equip the appropriate tool using `equip_item` with `destination="hand"`. 
+- if you need to move to the block to mine it, use `async_goto_block` (NOT `async_goto_position`) to navigate to the block's location. Wait until you receive `[SYSTEM EVENT: pathfinding_result]` before proceeding.
+- Once you receive the pathfinding success event, use `async_start_dig` to begin mining the block.
+- BEFORE using `async_start_dig`, check your inventory and equip the appropriate tool using `equip_item` with `destination="hand"`. 
   - For wood/logs, equip an axe.
   - For stone/ores, equip a pickaxe.
   - For dirt/sand/gravel, equip a shovel.
   - If you don't have the appropriate tool, consider crafting one first (see Crafting & Tool Tiers).
 - if you're next to the block (within 4 blocks), use `async_start_dig` to begin mining the block.
-- if you need to move to the block to mine it, use `async_goto_block` (NOT `async_goto_position`) to navigate to the block's location. Wait until you receive `[SYSTEM EVENT: pathfinding_result]` before proceeding.
-- Once you receive the pathfinding success event, use `async_start_dig` to begin mining the block.
 - Mining is an asynchronous process. It is considered finished when you receive a game update event of either `diggingCompleted` or `diggingAborted`.
 - When block is finished make sure you mined correct block name
 - Make sure you grab blocks from the ground after mining
