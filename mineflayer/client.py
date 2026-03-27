@@ -1,11 +1,9 @@
-from typing import Any
 from javascript import require
 from threading import Timer
 from .tools import Tools
 from .events import Events
 from .action_processor import ActionProcessor
-from agents.base_agent import BaseAgent
-import time
+from agents.multi_agent import MultiAgent
 import asyncio
 mineflayer = require('mineflayer')
 # run `uv run python3 -m javascript --install canvas` to install canvas
@@ -36,20 +34,19 @@ class Client:
         self._set_state(self.STATE_CONNECTING)
         self._init_connect_timer()
         self._tools = Tools(self)
-        self._agent = BaseAgent(self)
+        self._agent = MultiAgent(self)
         self._events = Events(self)
         self._events.bind()
     
-    def run(self):
-        try:
-            self._log('run')
-            while True:
-                self.action_processor.process_next()
-                time.sleep(0.1)
-        except KeyboardInterrupt:
-            self._log('KeyboardInterrupt')
-            self._set_state(self.STATE_DISCONNECTED)
-        pass
+    async def run(self):
+        self._log('run')
+        while True:
+            try:
+                await self.action_processor.process_next()
+            except KeyboardInterrupt:
+                self._log('KeyboardInterrupt')
+                self._set_state(self.STATE_DISCONNECTED)
+                break
 
     @property
     def tools(self):

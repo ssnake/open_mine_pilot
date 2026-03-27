@@ -59,11 +59,10 @@ class CraftingTool(Base):
             
         return self._result(True, f"Found {recipe_length} recipes for {item_name}", recipes=formatted_recipes)
 
-    def async_craft_item(self, item_name: str, count: int = 1, recipe_index: int = 0, crafting_table_x: int = None, crafting_table_y: int = None, crafting_table_z: int = None) -> dict[str, Any]:
+    def craft_item(self, item_name: str, count: int = 1, recipe_index: int = 0, crafting_table_x: int = None, crafting_table_y: int = None, crafting_table_z: int = None) -> dict[str, Any]:
         """
         Craft an item. 
-        This is an asynchronous operation. You MUST WAIT for `[SYSTEM EVENT: craftingCompleted]` 
-        or `[SYSTEM EVENT: craftingAborted]` before taking your next action.
+        This is an asynchronous operation but it will block until crafting completes or fails.
         
         Before calling this, you should use `get_recipes_for` to ensure you have the ingredients.
         
@@ -86,6 +85,7 @@ class CraftingTool(Base):
         if crafting_table_x is not None and crafting_table_y is not None and crafting_table_z is not None:
             target_pos = self._to_vec3({'x': crafting_table_x, 'y': crafting_table_y, 'z': crafting_table_z})
             table_block = self._bot.blockAt(target_pos)
+            
             if not table_block or 'crafting_table' not in getattr(table_block, 'name', ''):
                 return self._result(False, f"No crafting table found at {crafting_table_x}, {crafting_table_y}, {crafting_table_z}. You must look at one or go near one.")
                 
@@ -110,22 +110,29 @@ class CraftingTool(Base):
                 
                 self._client.action_processor.enqueue_system_event(
                     'craftingCompleted', 
-                    f"Successfully crafted {count}x {item_name}.", 
-                    self._state_machine._agent.get_active_trace_id() if hasattr(self._state_machine, '_agent') and hasattr(self._state_machine._agent, 'get_active_trace_id') else "system"
+                    f"Successfully crafted {count}x {item_name}.",
+                    "system"
                 )
             except Exception as e:
                 print(f"Error during async craft: {e}")
                 self._client.action_processor.enqueue_system_event(
                     'craftingAborted', 
                     f"Crafting failed: {str(e)}", 
-                    self._state_machine._agent.get_active_trace_id() if hasattr(self._state_machine, '_agent') and hasattr(self._state_machine._agent, 'get_active_trace_id') else "system"
+                    "system"
                 )
                 
-        # Set state machine to expect crafting completion
-        self._state_machine.set_state(self._state_machine.STATE_EXPECT_CRAFTING)
-        
         table_msg = "using 2x2 grid" if not table_block else f"using crafting table at {crafting_table_x}, {crafting_table_y}, {crafting_table_z}"
-        return self._result(True, f"Started crafting {count}x {item_name} {table_msg}.")
+        self._client.action_processor.answer_master(f"Started crafting {count}x {item_name} {table_msg}.")
+        
+        event_message = self._client.action_processor.wait_for_events(['craftingCompleted', 'craftingAborted'], timeout=60.0)
+            
+        if event_message == "":
+            return self._result(False, "Crafting timed out after 60 seconds")
+            
+        if "error" not in event_message and "aborted" not in event_message.lower() and "failed" not in event_message.lower():
+            return self._result(True, f"Successfully crafted {count}x {item_name}.")
+        else:
+            return self._result(False, event_message)
 
     def available_methods(self):
-        return [self.get_recipes_for, self.async_craft_item]
+        return [self.get_recipes_for, self.craft_item]

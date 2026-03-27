@@ -3,13 +3,12 @@ from .base import Base
 from javascript import AsyncTask
 
 class BuildingTool(Base):
-    def async_place_block(self, reference_x: int, reference_y: int, reference_z: int, face_x: int, face_y: int, face_z: int) -> dict[str, Any]:
+    def place_block(self, reference_x: int, reference_y: int, reference_z: int, face_x: int, face_y: int, face_z: int) -> dict[str, Any]:
         """
         Places a block in the world. The block placed will be whatever is currently equipped in the bot's hand.
         Use inventory.equip_item() first to hold the block you want to place.
         
-        This is an asynchronous operation. You MUST WAIT for a `[SYSTEM EVENT: placementCompleted]`
-        or `[SYSTEM EVENT: placementAborted]` before taking your next action.
+        This is an asynchronous operation but it will block until placement completes or fails.
         
         Args:
             reference_x (int): X coordinate of the block you are attaching to.
@@ -33,7 +32,7 @@ class BuildingTool(Base):
         bot_pos = self._bot.entity.position
         if bot_pos.distanceTo(reference_pos) > 5:
             return self._result(False, f"Reference block is too far away. You must move closer first.")
-
+            
         target_pos = self._to_vec3({'x': reference_x + face_x, 'y': reference_y + face_y, 'z': reference_z + face_z})
         
         # Calculate distance to center of the target block
@@ -43,12 +42,13 @@ class BuildingTool(Base):
         # Bot is ~0.6 wide and 1.8 tall. If the center of the block is within ~1.2 blocks of our feet, we might be inside it.
         if dist_to_center <= 1.2:
             return self._result(False, "Target position is too close to the bot (distance <= 1.2 blocks). Move away first to avoid placing the block inside yourself.")
-
+            
         # Check if we have an item equipped
         held_item = self._bot.heldItem
         if not held_item:
             return self._result(False, "You must equip a block in your hand first before placing it.")
             
+
         @AsyncTask(start=True)
         def do_place(task):
             try:
@@ -60,31 +60,38 @@ class BuildingTool(Base):
                 
                 self._client.action_processor.enqueue_system_event(
                     'placementCompleted', 
-                    f"Successfully placed {held_item.name} at {reference_x + face_x}, {reference_y + face_y}, {reference_z + face_z}.", 
-                    self._state_machine._agent.get_active_trace_id() if hasattr(self._state_machine, '_agent') and hasattr(self._state_machine._agent, 'get_active_trace_id') else "system"
+                    f"Successfully placed {held_item.name} at {reference_x + face_x}, {reference_y + face_y}, {reference_z + face_z}.",
+                    "system"
                 )
             except Exception as e:
                 err_str = str(e)
                 if 'did not fire within timeout' in err_str:
-                    # If the blockUpdate event doesn't fire, the server likely rejected the placement 
+                    # If the blockUpdate event doesn't fire, the server likely rejected the placement
                     # (e.g., trying to place it inside the bot's own body). Treat as failure.
                     self._client.action_processor.enqueue_system_event(
                         'placementAborted', 
-                        f"Placement failed: The server rejected the placement (timeout waiting for blockUpdate). Did you try to place it inside yourself or in an invalid location?", 
-                        self._state_machine._agent.get_active_trace_id() if hasattr(self._state_machine, '_agent') and hasattr(self._state_machine._agent, 'get_active_trace_id') else "system"
+                        f"Placement failed: The server rejected the placement (timeout waiting for blockUpdate). Did you try to place it inside yourself or in an invalid location?",
+                        "system"
                     )
                 else:
                     print(f"Error during async place: {err_str}")
                     self._client.action_processor.enqueue_system_event(
                         'placementAborted', 
-                        f"Placement failed: {err_str}", 
-                        self._state_machine._agent.get_active_trace_id() if hasattr(self._state_machine, '_agent') and hasattr(self._state_machine._agent, 'get_active_trace_id') else "system"
+                        f"Placement failed: {err_str}",
+                        "system"
                     )
                 
-        # Set state machine to expect placement completion
-        self._state_machine.set_state(self._state_machine.STATE_EXPECT_PLACEMENT)
+        self._client.action_processor.answer_master(f"Started placing {held_item.name} against block at {reference_x}, {reference_y}, {reference_z}")
         
-        return self._result(True, f"Started placing {held_item.name} against block at {reference_x}, {reference_y}, {reference_z}")
+        event_message = self._client.action_processor.wait_for_events(['placementCompleted', 'placementAborted'], timeout=15.0)
+
+        if event_message == "":
+            return self._result(False, "Placement timed out after 15 seconds")
+            
+        if "error" not in event_message and "aborted" not in event_message.lower() and "failed" not in event_message.lower():
+            return self._result(True, f"Successfully placed {held_item.name} at {reference_x + face_x}, {reference_y + face_y}, {reference_z + face_z}.")
+        else:
+            return self._result(False, event_message)
 
     def available_methods(self):
-        return [self.async_place_block]
+        return [self.place_block]

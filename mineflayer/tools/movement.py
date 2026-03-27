@@ -16,8 +16,8 @@ class MovementTools(Base):
             "get_my_position",
             "get_my_orientation",
             "set_my_orientation",
-            "async_goto_position",
-            "async_goto_block",
+            "goto_position",
+            "goto_block",
             "stop_pathing",
             "get_player_position",
             "follow_player",
@@ -114,16 +114,14 @@ class MovementTools(Base):
         
         return self._result(True, "Pathing stopped")
 
-    def async_goto_position(self, x: int, y: int, z: int, radius: int = 1) -> dict[str, Any]:
+    async def goto_position(self, x: int, y: int, z: int, radius: int = 1) -> dict[str, Any]:
         """
-        Navigate near an absolute block position. 
-        This is an asynchronous operation. This tool call must be final. 
-        Once is called expect following event from system:
-        - `[SYSTEM EVENT: pathfinding_result]` - Will contain message indicating success or failure (timeout, no path, etc.)
-
+        Navigate near an absolute block position.
+        This operation blocks until the bot reaches the destination or fails.
+        
         Note: If you are navigating to a solid block (like to mine it), it is highly recommended to use a radius of 3 or 4,
         because the bot cannot stand inside a solid block and will get stuck trying to reach it with radius=1.
-        Alternatively, use `async_goto_block` which is specifically designed for reaching blocks to interact with them.
+        Alternatively, use `goto_block` which is specifically designed for reaching blocks to interact with them.
 
         Args:
             x (int): Target X coordinate.
@@ -137,22 +135,30 @@ class MovementTools(Base):
 
         target = Vec3(int(x), int(y), int(z))
         goal = pathfinder.goals.GoalNear(target.x, target.y, target.z, int(radius))
+        
         self._bot.pathfinder.setGoal(goal)
         
-        # Set state to expect destination event
-        self._state_machine.set_state(self._state_machine.STATE_EXPECT_DESTINATION)
+        self._client.action_processor.answer_master(f"Goal target is set successfully. You're on the way! (Radius: {radius})")
         
-        return self._result(True, f"Goal target is set successfully. You're on the way! (Radius: {radius})", target=self._pos_to_dict(target), radius=int(radius))
+        event_message = await self._client.action_processor.wait_for_events(['pathfinding_result'], timeout=120.0)
+        self._bot.pathfinder.setGoal(None)
+        
+        if event_message == "":
+            return self._result(False, "Navigation timed out after 120 seconds")
 
-    def async_goto_block(self, x: int, y: int, z: int) -> dict[str, Any]:
+        success = 'error' not in event_message
+
+        if success:
+            return self._result(True, f"Navigation succeeded: {event_message}", target=self._pos_to_dict(target), radius=int(radius))
+        else:
+            return self._result(False, f"Navigation failed: {event_message}")
+
+    async def goto_block(self, x: int, y: int, z: int) -> dict[str, Any]:
         """
         Navigate to a position where you can break/interact with the specified block.
-        This is much more reliable than `async_goto_position` when you want to mine a block, 
+        This is much more reliable than `goto_position` when you want to mine a block, 
         as it ensures you get close enough to reach it without trying to stand inside it.
-        
-        This is an asynchronous operation. This tool call must be final. 
-        Once is called expect following event from system:
-        - `[SYSTEM EVENT: pathfinding_result]` - Will contain message indicating success or failure (timeout, no path, etc.)
+        This operation blocks until the bot reaches the block or fails.
 
         Args:
             x (int): Target block X coordinate.
@@ -165,12 +171,21 @@ class MovementTools(Base):
         
         target = Vec3(int(x), int(y), int(z))
         goal = pathfinder.goals.GoalLookAtBlock(target, self._bot.world)
+        
         self._bot.pathfinder.setGoal(goal)
         
-        # Set state to expect destination event
-        self._state_machine.set_state(self._state_machine.STATE_EXPECT_DESTINATION)
+        event_message = await self._client.action_processor.wait_for_events(['pathfinding_result'], timeout=120.0)
+        self._bot.pathfinder.setGoal(None)
         
-        return self._result(True, "Goal target set successfully. You are moving into range to interact with the block.", target={"x": x, "y": y, "z": z})
+        if event_message == "":
+            return self._result(False, "Navigation timed out after 120 seconds")
+
+        success = not "error" in event_message
+            
+        if success:
+            return self._result(True, f"Successfully reached the block: {event_message}", target={"x": x, "y": y, "z": z})
+        else:
+            return self._result(False, f"Failed to reach the block: {event_message}")
 
     def follow_player(self, username: str, distance: int = 2) -> dict[str, Any]:
         """

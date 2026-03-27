@@ -4,11 +4,10 @@ from javascript import AsyncTask, require
 import time
 
 class CollectTool(Base):
-    def async_collect_drops(self, x: int, y: int, z: int, search_radius: float = 3.0) -> dict[str, Any]:
+    def collect_drops(self, x: int, y: int, z: int, search_radius: float = 3.0) -> dict[str, Any]:
         """
         Looks for dropped items around the specified coordinates and moves to collect them.
-        This is an asynchronous operation. You MUST WAIT for a `[SYSTEM EVENT: collectionCompleted]`
-        or `[SYSTEM EVENT: collectionAborted]` before taking your next action.
+        This is an asynchronous operation but it will block until collection completes or fails.
         
         Args:
             x (int): X coordinate of the mined block.
@@ -78,8 +77,8 @@ class CollectTool(Base):
                 # Emit system event for completion
                 self._client.action_processor.enqueue_system_event(
                     'collectionCompleted', 
-                    f"Successfully collected {len(target_items)} dropped items.", 
-                    self._state_machine._agent.get_active_trace_id() if hasattr(self._state_machine, '_agent') and hasattr(self._state_machine._agent, 'get_active_trace_id') else "system"
+                    f"Successfully collected {len(target_items)} dropped items.",
+                    "system"
                 )
                 
             except Exception as e:
@@ -87,13 +86,21 @@ class CollectTool(Base):
                 self._client.action_processor.enqueue_system_event(
                     'collectionAborted', 
                     f"Collection failed: {str(e)}", 
-                    self._state_machine._agent.get_active_trace_id() if hasattr(self._state_machine, '_agent') and hasattr(self._state_machine._agent, 'get_active_trace_id') else "system"
+                    "system"
                 )
                 
-        # Set state to expect collection completion
-        self._state_machine.set_state(self._state_machine.STATE_EXPECT_COLLECTION)
+        self._client.action_processor.answer_master(f"Started pathing to collect {len(target_items)} dropped items near {x}, {y}, {z}")
         
-        return self._result(True, f"Started pathing to collect {len(target_items)} dropped items near {x}, {y}, {z}")
+        event_message = self._client.action_processor.wait_for_events(['collectionCompleted', 'collectionAborted'], timeout=60.0)
+            
+        if event_message == "":
+            self._bot.pathfinder.setGoal(None)
+            return self._result(False, "Collection timed out after 60 seconds")
+            
+        if "error" not in event_message and "aborted" not in event_message.lower() and "failed" not in event_message.lower():
+            return self._result(True, f"Successfully collected {len(target_items)} dropped items.")
+        else:
+            return self._result(False, event_message)
 
     def available_methods(self):
-        return [self.async_collect_drops]
+        return [self.collect_drops]

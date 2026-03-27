@@ -5,7 +5,7 @@
 - To craft an item, first call `get_recipes_for` to see the required ingredients and if a crafting table is needed.
 - If you lack ingredients, gather them first (e.g. punch trees for logs, craft planks, then sticks, then a wooden axe).
 - If the recipe requires a crafting table, FIRST check if there is already one nearby using `find_blocks` with `matching='crafting_table'`. 
-  - If you find one nearby, go to it using `async_goto_block`.
-  - ONLY if you don't find one, you should gather ingredients, craft one, equip it to 'hand' using `equip_item`, use `async_place_block` to place it on top of a nearby solid block (face_y=1), and then use `async_goto_block` to stand near it.
-- Once ingredients are ready and you are near a crafting table (if required), use `async_craft_item` to craft. You MUST wait for `[SYSTEM EVENT: craftingCompleted]` before proceeding.
+  - If you find one nearby, go to it using `goto_block`.
+  - ONLY if you don't find one, you should gather ingredients, craft one, equip it to 'hand' using `equip_item`, use `place_block` to place it on top of a nearby solid block (face_y=1), and then use `goto_block` to stand near it.
+- Once ingredients are ready and you are near a crafting table (if required), use `craft_item` to craft. You MUST wait for `[SYSTEM EVENT: craftingCompleted]` before proceeding.
 - Before mining blocks, equip the crafted tool (e.g., using an equip tool if available).

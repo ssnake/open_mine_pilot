@@ -7,18 +7,18 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
-from agents.base_agent import BaseAgent
+from agents.basic_agent import BasicAgent
 
 
-def test_base_agent_exists():
-    assert BaseAgent is not None
+def test_basic_agent_exists():
+    assert BasicAgent is not None
 
 
 @pytest.mark.skipif(
     not (os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")),
     reason="Set GOOGLE_API_KEY or GEMINI_API_KEY to run live agent response tests.",
 )
-def test_base_agent_answers_prompt():
+def test_basic_agent_answers_prompt():
     session_service = InMemorySessionService()
     app_name = "mine_agent_tests"
     user_id = "test_user"
@@ -43,7 +43,7 @@ def test_base_agent_answers_prompt():
 
     runner = Runner(
         app_name=app_name,
-        agent=BaseAgent(MockClient())._root_agent,
+        agent=BasicAgent(MockClient())._root_agent,
         session_service=session_service,
     )
 

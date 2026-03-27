@@ -4,7 +4,13 @@ from .base import Base
 class CreativeTools(Base):
     def __init__(self, client):
         super().__init__(client)
-        self._Item = require("prismarine-item")(self._bot.version)
+        self._item_cache = None
+
+    @property
+    def _Item(self):
+        if self._item_cache is None:
+            self._item_cache = require("prismarine-item")(self._bot.version)
+        return self._item_cache
 
     def set_inventory_slot(self, slot: int, item_name: str, count: int = 1):
         """

@@ -13,7 +13,7 @@ from .state_machine import AgentStateMachine
 
 load_dotenv()
 
-class BaseAgent:
+class BasicAgent:
     def __init__(self, client):
         self._client = client
         self._tools = self._client.tools
@@ -42,11 +42,11 @@ class BaseAgent:
         return skills
 
     def _init_agents(self):
-        knowledge = self._get_knowledge()
-        skills = self._get_skills()
+        self._root_agent = self._init_general_agent()
 
-        self._root_agent = Agent(
-            name="main_minecraft_agent",
+    def _init_general_agent(self):
+        return Agent(
+            name="basic_agent",
             # model="gemini-3-flash-preview",
             # model="gemini-2.5-flash",
             model="gemini-3.1-flash-lite-preview",
@@ -59,11 +59,12 @@ class BaseAgent:
             - If you need a tool, craft it. If you need materials, gather them. Take initiative.
             - Do NOT ask the master what to do next if you are in the middle of completing a complex task.
             - Only speak to the master when you have fully completed their request, or if you are completely and unrecoverably stuck.
+            - When you're done with a request, you MUST call `transfer_to_agent` with agent_name="TaskCoordinator" to return control.
             
             Your master username is {self._client._master_username}
             
-            {knowledge}
-            {skills}
+            {self._get_knowledge()}
+            {self._get_skills()}
             """,
             tools=self._tools.available_methods(),
         )
@@ -89,37 +90,41 @@ class BaseAgent:
             return False
         return True
         
-    def _is_async_function_successful_response(self, event):
-        if not event.get_function_responses():
-            return False
-
-        response = event.get_function_responses()[0]
-        name = response.name
-        response  = response.response
-        return name.startswith('async_') and response.get("status") == "success"
-        
     def _is_there_incoming_event(self):
         return self._client.action_processor.has_incoming_agent_events()
+
+    def _handle_event(self, event, trace_id):
+        self._debug_event(event, trace_id)
+
+        final_response_text = None
+
+        if event.is_final_response():
+            if event.content and event.content.parts:
+                # Assuming text response in the first part
+                final_response_text = event.content.parts[0].text
+            elif event.actions and event.actions.escalate: # Handle potential errors/escalations
+                final_response_text = f"Agent escalated: {event.error_message or 'No specific message.'}"
+
+            if event.actions and event.actions.escalate:
+                return True, final_response_text
+
+            return False, final_response_text
+
+        return False, final_response_text
 
     async def call_async(self, message, trace_id) -> str:
         self._log(f'[call]: {message}', trace_id)
         final_response_text = ""
         content = types.Content(role='user', parts=[types.Part(text=message)])
+
+        self._session.state['trace_id'] = trace_id
         
         try:
             async for event in self._runner.run_async(user_id=self._USER_ID, session_id=self._SESSION_ID, new_message=content):
-                self._debug_event(event, trace_id)
-
-                if event.is_final_response():          
-                    if event.content and event.content.parts:
-                        # Assuming text response in the first part
-                        final_response_text = event.content.parts[0].text
-                    elif event.actions and event.actions.escalate: # Handle potential errors/escalations
-                        final_response_text = f"Agent escalated: {event.error_message or 'No specific message.'}"
-                    break # Stop processing events once the final response is found
-
-                if self._is_async_function_successful_response(event):
-                    self._log(f'[call]: Async function success response received', trace_id)
+                should_break, response_text = self._handle_event(event, trace_id)
+                if response_text is not None:
+                    final_response_text = response_text
+                if should_break:
                     break
         except Exception as e:
             self._log(f'[Error]: LLM provider error or internal failure: {str(e)}', trace_id)
@@ -129,7 +134,7 @@ class BaseAgent:
                 self.state_machine.set_state(self.state_machine.STATE_IDLE)
             final_response_text = f"Agent encountered an internal error: {str(e)}"
 
-        return final_response_text      
+        return final_response_text
 
     def _debug_event(self, event, trace_id=None):
         self._log(f"[Event]: Author: {event.author}, Type: {type(event).__name__}, Final: {event.is_final_response()}", trace_id)

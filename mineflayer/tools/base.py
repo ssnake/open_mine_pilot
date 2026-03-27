@@ -11,9 +11,25 @@ class Base:
         # Handle cases where just bot is passed for backwards compatibility
         self._bot = getattr(client, 'bot', client)
         self._bot.loadPlugin(pathfinder.pathfinder)
-        self._mc_data = require("minecraft-data")(self._bot.version)
-        self._movements = pathfinder.Movements(self._bot, self._mc_data)
-        self._bot.pathfinder.setMovements(self._movements)
+        
+        # Note: self._mc_data and self._movements need to be initialized 
+        # AFTER the bot has fully spawned and received its version from the server.
+        # They will be lazily loaded in the tools when needed.
+        self._mc_data_cache = None
+        self._movements_cache = None
+
+    @property
+    def _mc_data(self):
+        if self._mc_data_cache is None:
+            self._mc_data_cache = require("minecraft-data")(self._bot.version)
+        return self._mc_data_cache
+
+    @property
+    def _movements(self):
+        if self._movements_cache is None:
+            self._movements_cache = pathfinder.Movements(self._bot, self._mc_data)
+            self._bot.pathfinder.setMovements(self._movements_cache)
+        return self._movements_cache
 
     @property
     def _state_machine(self):
