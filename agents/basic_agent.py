@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 from google.adk.agents import Agent
+from google.adk.events import Event, EventActions
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google import genai
@@ -10,6 +11,7 @@ import queue
 import uuid
 import traceback
 from .state_machine import AgentStateMachine
+from logger import log
 
 load_dotenv()
 
@@ -83,7 +85,7 @@ class BasicAgent:
         self._runner = Runner(agent=self._root_agent, app_name=self._APP_NAME, session_service=self._session_service)
 
     def _log(self, message, trace_id=None):
-        print(f'[Agent]:{trace_id} {message}')
+        log('Agent', message, trace_id)
 
     def _is_function_response(self, event):
         if not event.get_function_responses():
@@ -117,8 +119,15 @@ class BasicAgent:
         final_response_text = ""
         content = types.Content(role='user', parts=[types.Part(text=message)])
 
-        self._session.state['trace_id'] = trace_id
-        
+        await self._session_service.append_event(
+            self._session,
+            Event(
+                invocation_id=trace_id,
+                author='user',
+                actions=EventActions(state_delta={'trace_id': trace_id}),
+            ),
+        )
+
         try:
             async for event in self._runner.run_async(user_id=self._USER_ID, session_id=self._SESSION_ID, new_message=content):
                 should_break, response_text = self._handle_event(event, trace_id)

@@ -7,7 +7,7 @@ from .complex_agent import ComplexAgent
 
 class MultiAgent(BasicAgent):
     def _default_model(self) -> str:
-        return 'gemini-3.1-flash-lite-preview'
+        return 'gemini-3.1-flash-lite'
     
     def _init_agents(self):
         complex_agent = self._init_complex_agent()

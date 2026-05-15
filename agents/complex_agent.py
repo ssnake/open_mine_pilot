@@ -84,7 +84,7 @@ class ComplexAgent(Agent):
             instruction=f"""
             You are an action agent. You're part of a bigger agent system that can execute tasks in Minecraft.
             You should execute tasks based on the plan provided by the planner agent.
-            Here is plan. Tasks that should be done is marked wiht [ ]:
+            Here is plan. Tasks that should be done is marked with [ ]:
             {{plan}}
 
             Once you complete a task, mark it with [x].
@@ -108,10 +108,10 @@ class ComplexAgent(Agent):
             self.log_callback(f'[{self.name}] started', trace_id)
 
         async for event in self.loop_agent.run_async(ctx):      
-            # if self.log_callback:
-                # self.log_callback(f"[{self.name}] Event: {event.model_dump_json(indent=2, exclude_none=True)}", trace_id)          
             if event.content and event.content.parts:
                 part_texts = [part.text for part in event.content.parts if getattr(part, 'text', None)]
                 if any(self.COMPLETION_PHRASE in part_text for part_text in part_texts):
+                    self.log_callback(f'[{self.name}] Completion phrase detected, stopping', trace_id)
+                    self.log_callback(f"[{self.name}] Event: {event.model_dump_json(indent=2, exclude_none=True)}", trace_id)          
                     break
             yield event

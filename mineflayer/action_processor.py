@@ -3,6 +3,7 @@ from collections import deque
 import queue
 import threading
 import time
+from logger import log
 
 class ActionProcessor:
     def __init__(self, client):
@@ -73,5 +74,5 @@ class ActionProcessor:
         self._publish_system_event(event_name, message, trace_id)
 
     def _log(self, message: str, trace_id: str | None = None):
-        print(f'[ActionProcessor]:{trace_id} {message}')
+        log('ActionProcessor', message, trace_id)
 
