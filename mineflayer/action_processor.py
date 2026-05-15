@@ -13,23 +13,19 @@ class ActionProcessor:
         
     def _enqueue_action(self, action_type: str, args):
         self._queue.put_nowait((action_type, args))
-
-    def _publish_system_event(self, event_name: str, message: str, trace_id: str):
-        formatted_message = f"[SYSTEM EVENT: {event_name}] {message}"
-        self._log(formatted_message, trace_id)
-        self._expecting_events.put_nowait((event_name, message, trace_id))
     
     async def _handle_chat(self, message: str, trace_id: str):
         result = await self._client.agent.call_async(message, trace_id)
         if result:
             self.answer_master(result)
 
-    async def _handle_system_event(self, event_name: str, message: str, trace_id: str): 
-        self._publish_system_event(event_name, message, trace_id)
-
-
     async def process_next(self):
-        action_type, args = await asyncio.to_thread(self._queue.get)
+        while True:
+            try:
+                action_type, args = await asyncio.to_thread(self._queue.get, True, 0.1)
+                break
+            except queue.Empty:
+                continue
 
         if action_type == 'whisper':
             username, message = args
@@ -38,8 +34,6 @@ class ActionProcessor:
             self._client.bot.chat(args)
         elif action_type == 'chat':
            await self._handle_chat(*args)
-        elif action_type == 'system_event':
-           await self._handle_system_event(*args)
 
 
     async def wait_for_events(self, events: list[str], timeout: float) -> str:
@@ -67,11 +61,13 @@ class ActionProcessor:
         else:
             self.whisper(self._client._master_username, message)
 
-    def enqueue_chat(self, message: str, trace_id: str):
+    def chat(self, message: str, trace_id: str):
         self._enqueue_action('chat', (message, trace_id))
 
     def enqueue_system_event(self, event_name: str, message: str, trace_id: str):
-        self._publish_system_event(event_name, message, trace_id)
+        formatted_message = f"[SYSTEM EVENT: {event_name}] {message}"
+        self._log(formatted_message, trace_id)
+        self._expecting_events.put_nowait((event_name, message, trace_id))
 
     def _log(self, message: str, trace_id: str | None = None):
         log('ActionProcessor', message, trace_id)

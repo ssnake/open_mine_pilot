@@ -59,7 +59,7 @@ class CraftingTool(Base):
             
         return self._result(True, f"Found {recipe_length} recipes for {item_name}", recipes=formatted_recipes)
 
-    def craft_item(self, item_name: str, count: int = 1, recipe_index: int = 0, crafting_table_x: int = None, crafting_table_y: int = None, crafting_table_z: int = None) -> dict[str, Any]:
+    async def craft_item(self, item_name: str, count: int = 1, recipe_index: int = 0, crafting_table_x: int = None, crafting_table_y: int = None, crafting_table_z: int = None) -> dict[str, Any]:
         """
         Craft an item. 
         This is an asynchronous operation but it will block until crafting completes or fails.
@@ -124,7 +124,7 @@ class CraftingTool(Base):
         table_msg = "using 2x2 grid" if not table_block else f"using crafting table at {crafting_table_x}, {crafting_table_y}, {crafting_table_z}"
         self._client.action_processor.answer_master(f"Started crafting {count}x {item_name} {table_msg}.")
         
-        event_message = self._client.action_processor.wait_for_events(['craftingCompleted', 'craftingAborted'], timeout=60.0)
+        event_message = await self._client.action_processor.wait_for_events(['craftingCompleted', 'craftingAborted'], timeout=60.0)
             
         if event_message == "":
             return self._result(False, "Crafting timed out after 60 seconds")

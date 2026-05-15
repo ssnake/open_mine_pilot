@@ -4,7 +4,7 @@ from javascript import AsyncTask, require
 import time
 
 class CollectTool(Base):
-    def collect_drops(self, x: int, y: int, z: int, search_radius: float = 3.0) -> dict[str, Any]:
+    async def collect_drops(self, x: int, y: int, z: int, search_radius: float = 3.0) -> dict[str, Any]:
         """
         Looks for dropped items around the specified coordinates and moves to collect them.
         This is an asynchronous operation but it will block until collection completes or fails.
@@ -91,7 +91,7 @@ class CollectTool(Base):
                 
         self._client.action_processor.answer_master(f"Started pathing to collect {len(target_items)} dropped items near {x}, {y}, {z}")
         
-        event_message = self._client.action_processor.wait_for_events(['collectionCompleted', 'collectionAborted'], timeout=60.0)
+        event_message = await self._client.action_processor.wait_for_events(['collectionCompleted', 'collectionAborted'], timeout=60.0)
             
         if event_message == "":
             self._bot.pathfinder.setGoal(None)

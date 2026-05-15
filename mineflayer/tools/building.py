@@ -3,7 +3,7 @@ from .base import Base
 from javascript import AsyncTask
 
 class BuildingTool(Base):
-    def place_block(self, reference_x: int, reference_y: int, reference_z: int, face_x: int, face_y: int, face_z: int) -> dict[str, Any]:
+    async def place_block(self, reference_x: int, reference_y: int, reference_z: int, face_x: int, face_y: int, face_z: int) -> dict[str, Any]:
         """
         Places a block in the world. The block placed will be whatever is currently equipped in the bot's hand.
         Use inventory.equip_item() first to hold the block you want to place.
@@ -83,7 +83,7 @@ class BuildingTool(Base):
                 
         self._client.action_processor.answer_master(f"Started placing {held_item.name} against block at {reference_x}, {reference_y}, {reference_z}")
         
-        event_message = self._client.action_processor.wait_for_events(['placementCompleted', 'placementAborted'], timeout=15.0)
+        event_message = await self._client.action_processor.wait_for_events(['placementCompleted', 'placementAborted'], timeout=15.0)
 
         if event_message == "":
             return self._result(False, "Placement timed out after 15 seconds")

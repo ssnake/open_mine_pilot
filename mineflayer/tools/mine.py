@@ -71,12 +71,19 @@ class MineTool(Base):
             # bot.dig returns a Promise in JS. We must run it as an AsyncTask
             # so JSPyBridge doesn't block the Python main thread waiting for it.
             # If it blocks, diggingCompleted/diggingAborted events will never fire.
+            block_name = getattr(block, 'name', 'unknown')
+
             @AsyncTask(start=True)
             def do_dig(task):
                 try:
                     # Provide a long timeout (e.g. 100 seconds) so the JSPyBridge does not timeout internally.
                     # Mining obsidian takes a long time, and the bridge default timeout is 10s.
                     self._bot.dig(block, timeout=100)
+                    self._client.action_processor.enqueue_system_event(
+                        'diggingCompleted',
+                        f"Finished digging block '{block_name}' at {x}, {y}, {z}",
+                        "system"
+                    )
                 except Exception as e:
                     print(f"Error during async dig: {e}")
                     self._client.action_processor.enqueue_system_event(

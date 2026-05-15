@@ -1,5 +1,6 @@
 from javascript import require
 from threading import Timer, BrokenBarrierError
+from contextlib import suppress
 from .tools import Tools
 from .events import Events
 from .action_processor import ActionProcessor
@@ -46,15 +47,17 @@ class Client:
             while True:
                 try:
                     await self.action_processor.process_next()
-                except KeyboardInterrupt:
-                    self._log('KeyboardInterrupt')
+                except asyncio.CancelledError:
+                    self._log('CancelledError')
                     self._set_state(self.STATE_DISCONNECTED)
-                    break
+                    raise
                 if self._state == self.STATE_DISCONNECTED:
                     self._log('disconnected, stopping run loop')
                     break
         finally:
             heartbeat.cancel()
+            with suppress(asyncio.CancelledError):
+                await heartbeat
 
     async def _heartbeat_loop(self, interval: float = 1.0, probe_timeout: float = 3.0):
         loop = asyncio.get_running_loop()

@@ -51,7 +51,7 @@ class BasicAgent:
             name="basic_agent",
             # model="gemini-3-flash-preview",
             # model="gemini-2.5-flash",
-            model="gemini-3.1-flash-lite-preview",
+            model="gemini-3.1-flash-lite",
             description="The main coordinator agent. Handles direct question or can delegate to subagents.",
             instruction=f"""
             You are an autonomous Minecraft agent controlling a mob in the game. You must execute the master user's orders efficiently and independently. You can use tools to interact with the game.
@@ -114,9 +114,20 @@ class BasicAgent:
 
         return False, final_response_text
 
+    _TRANSIENT_ERROR_MARKERS = (
+        '503', '429', 'UNAVAILABLE', 'RESOURCE_EXHAUSTED',
+        'overloaded', 'high demand', 'DEADLINE_EXCEEDED',
+    )
+    _MAX_LLM_ATTEMPTS = 3
+    _INITIAL_BACKOFF_SECONDS = 1.0
+
+    @classmethod
+    def _is_transient_llm_error(cls, error: Exception) -> bool:
+        msg = str(error)
+        return any(marker in msg for marker in cls._TRANSIENT_ERROR_MARKERS)
+
     async def call_async(self, message, trace_id) -> str:
         self._log(f'[call]: {message}', trace_id)
-        final_response_text = ""
         content = types.Content(role='user', parts=[types.Part(text=message)])
 
         await self._session_service.append_event(
@@ -128,22 +139,37 @@ class BasicAgent:
             ),
         )
 
-        try:
-            async for event in self._runner.run_async(user_id=self._USER_ID, session_id=self._SESSION_ID, new_message=content):
-                should_break, response_text = self._handle_event(event, trace_id)
-                if response_text is not None:
-                    final_response_text = response_text
-                if should_break:
-                    break
-        except Exception as e:
-            self._log(f'[Error]: LLM provider error or internal failure: {str(e)}', trace_id)
-            # You can also use traceback.print_exc() if you need more details in the logs.
-            if self.state_machine.state != self.state_machine.STATE_IDLE:
-                self._log(f'[Warning]: Resetting state machine from {self.state_machine.state} to idle due to error', trace_id)
-                self.state_machine.set_state(self.state_machine.STATE_IDLE)
-            final_response_text = f"Agent encountered an internal error: {str(e)}"
+        backoff = self._INITIAL_BACKOFF_SECONDS
+        last_error: Exception | None = None
 
-        return final_response_text
+        for attempt in range(1, self._MAX_LLM_ATTEMPTS + 1):
+            final_response_text = ""
+            try:
+                async for event in self._runner.run_async(user_id=self._USER_ID, session_id=self._SESSION_ID, new_message=content):
+                    should_break, response_text = self._handle_event(event, trace_id)
+                    if response_text is not None:
+                        final_response_text = response_text
+                    if should_break:
+                        break
+                return final_response_text
+            except Exception as e:
+                last_error = e
+                self._log(traceback.format_exc().rstrip(), trace_id)
+                if self._is_transient_llm_error(e) and attempt < self._MAX_LLM_ATTEMPTS:
+                    self._log(
+                        f'[Retry {attempt}/{self._MAX_LLM_ATTEMPTS - 1}]: transient LLM error, sleeping {backoff:.1f}s: {str(e)}',
+                        trace_id,
+                    )
+                    await asyncio.sleep(backoff)
+                    backoff *= 2
+                    continue
+                break
+
+        self._log(f'[Error]: LLM provider error or internal failure: {str(last_error)}', trace_id)
+        if self.state_machine.state != self.state_machine.STATE_IDLE:
+            self._log(f'[Warning]: Resetting state machine from {self.state_machine.state} to idle due to error', trace_id)
+            self.state_machine.set_state(self.state_machine.STATE_IDLE)
+        return f"Agent encountered an internal error: {str(last_error)}"
 
     def _debug_event(self, event, trace_id=None):
         self._log(f"[Event]: Author: {event.author}, Type: {type(event).__name__}, Final: {event.is_final_response()}", trace_id)

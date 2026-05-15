@@ -9,7 +9,7 @@ class BasicEvents(Base):
             if username == self._client._master_username:
                 trace_id = self.trace_id()
                 self._log(f'Chat: {username}: {message}', trace_id)
-                self._client.action_processor.enqueue_chat(message, trace_id)
+                self._client.action_processor.chat(message, trace_id)
 
         @On(self._bot, 'end')
         def on_end(this, reason, *rest):

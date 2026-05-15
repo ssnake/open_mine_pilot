@@ -1,6 +1,6 @@
 from google.adk.agents import LoopAgent, LlmAgent, Agent
 from google.adk.agents import InvocationContext
-from google.adk.events import Event
+from google.adk.events import Event, EventActions
 from typing import AsyncGenerator, ClassVar
 
 class ComplexAgent(Agent):
@@ -40,7 +40,7 @@ class ComplexAgent(Agent):
         return LlmAgent(
             name='PlannerAgent',
             description='Planner agent for complex task planning',
-            model=model,
+            model='gemini-3.1-pro-preview',
             instruction=f"""
             You are a planner agent. You're part of a bigger agent system that can execute tasks in Minecraft.
             You should plan complex tasks for delegating them to other agents.
@@ -88,13 +88,15 @@ class ComplexAgent(Agent):
             {{plan}}
 
             Once you complete a task, mark it with [x].
-            If you encounter an error, mark the task with [!] and explain the error after original text. For example:
+            If you encounter an error, mark the task with [!] and explain the error after original text and return control to planner. For example:
             ```
             [!] Craft a axe: I don't have enough resources
             ```
 
             You must return updated plan if the plan is not finished. 
-            If the plan has completed all tasks you must return "{self.COMPLETION_PHRASE}".
+            If the plan has completed all tasks and no user-facing reply is needed, return exactly "{self.COMPLETION_PHRASE}".
+            If the plan has completed all tasks and a user-facing reply is necessary, return a short user-facing message followed by "{self.COMPLETION_PHRASE}".
+            Never include the plan in the completion response.
 
             """,
             tools=tools.available_methods(),
@@ -107,11 +109,31 @@ class ComplexAgent(Agent):
         if self.log_callback:
             self.log_callback(f'[{self.name}] started', trace_id)
 
+        await ctx.session_service.append_event(
+            ctx.session,
+            Event(
+                invocation_id=ctx.invocation_id,
+                author=self.name,
+                actions=EventActions(
+                    state_delta={'plan': None, 'updated_plan': None},
+                    agent_state={'status': 'running'},
+                ),
+            ),
+        )
+
         async for event in self.loop_agent.run_async(ctx):      
             if event.content and event.content.parts:
                 part_texts = [part.text for part in event.content.parts if getattr(part, 'text', None)]
                 if any(self.COMPLETION_PHRASE in part_text for part_text in part_texts):
                     self.log_callback(f'[{self.name}] Completion phrase detected, stopping', trace_id)
-                    self.log_callback(f"[{self.name}] Event: {event.model_dump_json(indent=2, exclude_none=True)}", trace_id)          
+                    self.log_callback(f"[{self.name}] Event: {event.model_dump_json(indent=2, exclude_none=True)}", trace_id)
+                    await ctx.session_service.append_event(
+                        ctx.session,
+                        Event(
+                            invocation_id=ctx.invocation_id,
+                            author=self.name,
+                            actions=EventActions(end_of_agent=True),
+                        ),
+                    )
                     break
             yield event
