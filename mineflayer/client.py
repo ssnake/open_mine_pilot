@@ -32,17 +32,16 @@ class Client:
         })
 
         self._viewer = None
-        self._events = Events(self)
-        self._events.bind()
-
         self._set_state(self.STATE_CONNECTING)
         self._log(f'connecting to {host}:{port} as {username}')
+        self._events = Events(self)
+        self._events.bind()
+        self._init_connect_timer()
         self._tools = Tools(self)
         self._agent = MultiAgent(self)
-        self._init_connect_timer()
     
     async def run(self):
-        self._log('run')
+        self._log('started')
         heartbeat = asyncio.create_task(self._heartbeat_loop())
         try:
             while True:
@@ -114,6 +113,8 @@ class Client:
         self._state = new_state
 
     def _init_connect_timer(self):
+        if self._state == self.STATE_CONNECTED:
+            return
         self._reset_connect_timer()
 
         def _timeout():

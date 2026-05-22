@@ -95,25 +95,6 @@ class BasicAgent:
     def _is_there_incoming_event(self):
         return self._client.action_processor.has_incoming_agent_events()
 
-    def _handle_event(self, event, trace_id):
-        self._debug_event(event, trace_id)
-
-        final_response_text = None
-
-        if event.is_final_response():
-            if event.content and event.content.parts:
-                # Assuming text response in the first part
-                final_response_text = event.content.parts[0].text
-            elif event.actions and event.actions.escalate: # Handle potential errors/escalations
-                final_response_text = f"Agent escalated: {event.error_message or 'No specific message.'}"
-
-            if event.actions and event.actions.escalate:
-                return True, final_response_text
-
-            return False, final_response_text
-
-        return False, final_response_text
-
     _TRANSIENT_ERROR_MARKERS = (
         '503', '429', 'UNAVAILABLE', 'RESOURCE_EXHAUSTED',
         'overloaded', 'high demand', 'DEADLINE_EXCEEDED',
@@ -170,6 +151,26 @@ class BasicAgent:
             self._log(f'[Warning]: Resetting state machine from {self.state_machine.state} to idle due to error', trace_id)
             self.state_machine.set_state(self.state_machine.STATE_IDLE)
         return f"Agent encountered an internal error: {str(last_error)}"
+
+    def _handle_event(self, event, trace_id):
+        self._debug_event(event, trace_id)
+
+        final_response_text = None
+
+        if event.is_final_response():
+            if event.content and event.content.parts:
+                # Assuming text response in the first part
+                final_response_text = event.content.parts[0].text
+            elif event.actions and event.actions.escalate: # Handle potential errors/escalations
+                final_response_text = f"Agent escalated: {event.error_message or 'No specific message.'}"
+
+            if event.actions and event.actions.escalate:
+                return True, final_response_text
+
+            return False, final_response_text
+
+        return False, final_response_text
+
 
     def _debug_event(self, event, trace_id=None):
         self._log(f"[Event]: Author: {event.author}, Type: {type(event).__name__}, Final: {event.is_final_response()}", trace_id)

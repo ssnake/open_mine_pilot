@@ -40,7 +40,7 @@ class ComplexAgent(Agent):
         return LlmAgent(
             name='PlannerAgent',
             description='Planner agent for complex task planning',
-            model='gemini-3.1-pro-preview',
+            model=model,
             instruction=f"""
             You are a planner agent. You're part of a bigger agent system that can execute tasks in Minecraft.
             You should plan complex tasks for delegating them to other agents.
