@@ -8,6 +8,11 @@ services:
     environment:
       EULA: "TRUE"
       VERSION: "1.20.1"
+      RCON_CMDS_STARTUP: |
+        gamerule doDaylightCycle false
+        time set 6000
+        gamerule doWeatherCycle false
+        weather clear
     volumes:
       - ./server/data:/data
 

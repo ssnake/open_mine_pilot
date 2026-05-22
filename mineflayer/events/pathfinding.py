@@ -4,8 +4,7 @@ from .base import Base
 class PathfindingEvents(Base):
     def __init__(self, client):
         super().__init__(client)
-        self._agent = client.agent
-        
+
     def bind(self):
         @On(self._bot, 'goal_reached')
         def on_goal_reached(this, goal):

@@ -13,7 +13,8 @@ class BasicEvents(Base):
 
         @On(self._bot, 'end')
         def on_end(this, reason, *rest):
-            self._log(f'End: {reason}, {rest}', self.trace_id())
+            self._log(f'End: {reason}', self.trace_id())
+            self._client._set_state(self._client.STATE_DISCONNECTED)
 
         @On(self._bot, 'error')
         def on_error(this, error, *rest):

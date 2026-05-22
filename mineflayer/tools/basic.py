@@ -178,8 +178,8 @@ class BasicTools(Base):
 
     def available_methods(self):
         return [
-            self.set_gamemode,
-            self.get_gamemode,
+            # self.set_gamemode,
+            # self.get_gamemode,
             self.set_quick_bar_slot,
             self.can_see_block,
             self.find_blocks,

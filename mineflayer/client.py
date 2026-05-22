@@ -32,13 +32,14 @@ class Client:
         })
 
         self._viewer = None
-            
-        self._set_state(self.STATE_CONNECTING)
-        self._init_connect_timer()
-        self._tools = Tools(self)
-        self._agent = MultiAgent(self)
         self._events = Events(self)
         self._events.bind()
+
+        self._set_state(self.STATE_CONNECTING)
+        self._log(f'connecting to {host}:{port} as {username}')
+        self._tools = Tools(self)
+        self._agent = MultiAgent(self)
+        self._init_connect_timer()
     
     async def run(self):
         self._log('run')
@@ -140,4 +141,4 @@ class Client:
                 'firstPerson': False,
                 'viewDistance': 6
             })
-            self._log('viewer is initialized')
+            self._log('viewer is initialized, open http://localhost:3001 to view')

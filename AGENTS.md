@@ -46,6 +46,10 @@ uv run main.py
 ```
 
 ## Development Knowledge & Best Practices
+### Keep updating knowledge
+
+If you find out a new nuance please propose updating this section. Always be mindful about new information. We don't want to flood this section
+
 
 ### Asynchronous Tools (Mineflayer & JSPyBridge)
 When defining asynchronous tools for the Mineflayer bot (like digging, picking up items, crafting, or placing blocks):
