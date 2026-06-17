@@ -18,8 +18,8 @@ def create_general_agent(*, model: str, orchestrator) -> Agent:
 
             Your master username is {orchestrator._client._master_username}
 
-            {orchestrator._get_knowledge()}
-            {orchestrator._get_skills()}
+            {orchestrator.get_knowledge()}
+            {orchestrator.get_skills()}
             """,
         tools=orchestrator._tools.available_methods(),
     )

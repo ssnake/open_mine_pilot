@@ -25,7 +25,7 @@ class AgentOrchestrator:
         self._init_agents()
         self._init_runner()
 
-    def _get_knowledge(self):
+    def get_knowledge(self):
         knowledge_path = os.path.join(os.path.dirname(__file__), "knowledge.md")
         try:
             with open(knowledge_path, "r", encoding="utf-8") as f:
@@ -33,7 +33,7 @@ class AgentOrchestrator:
         except FileNotFoundError:
             return ""
 
-    def _get_skills(self):
+    def get_skills(self):
         import glob
         skills_dir = os.path.join(os.path.dirname(__file__), "skills")
         skills = "Skills\n\n"

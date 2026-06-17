@@ -66,8 +66,8 @@ class ComplexAgent(Agent):
             {{updated_plan?}}
             ```
 
-            {orchestrator._get_knowledge()}
-            {orchestrator._get_skills()}
+            {orchestrator.get_knowledge()}
+            {orchestrator.get_skills()}
 
             You must return only plan.
             """,
