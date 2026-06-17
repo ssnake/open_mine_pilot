@@ -15,18 +15,15 @@ class ComplexAgent(Agent):
 
     def __init__(self,
                 model: str,
-                client,
-                tools,
-                knowledge: str,
-                skills: str,
+                orchestrator,
                 log_callback=None):
-        planner_agent = self._init_planner_agent(model, client, knowledge, skills)
-        action_agent = self._init_action_agent(model, tools)
+        planner_agent = self._init_planner_agent(model, orchestrator)
+        action_agent = self._init_action_agent(model, orchestrator)
         loop_agent = LoopAgent(
             name='PlannerActionLoop',
             sub_agents=[planner_agent, action_agent],
             max_iterations=2)
-        
+
         super().__init__(
             name='ComplexAgent',
             planner_agent=planner_agent,
@@ -36,7 +33,7 @@ class ComplexAgent(Agent):
             log_callback=log_callback
             )
 
-    def _init_planner_agent(self, model: str, client, knowledge: str, skills: str) -> LlmAgent:
+    def _init_planner_agent(self, model: str, orchestrator) -> LlmAgent:
         return LlmAgent(
             name='PlannerAgent',
             description='Planner agent for complex task planning',
@@ -60,23 +57,23 @@ class ComplexAgent(Agent):
              [ ] collect oak logs
              [ ] inform user when task is completed
              ```
-            Your master username is {client._master_username}
+            Your master username is {orchestrator._client._master_username}
 
-            Here is updated plan from previous iteration. 
+            Here is updated plan from previous iteration.
             Steps that are already done are marked with [x]. Step that are not yet done are marked with [ ].
             If you see step with [!], it means that step failed. You should try to fix it:
             ```
             {{updated_plan?}}
             ```
 
-            {knowledge}
-            {skills}
+            {orchestrator._get_knowledge()}
+            {orchestrator._get_skills()}
 
             You must return only plan.
             """,
             output_key='plan')
 
-    def _init_action_agent(self, model: str, tools) -> LlmAgent:
+    def _init_action_agent(self, model: str, orchestrator) -> LlmAgent:
         return LlmAgent(
             name='ActionAgent',
             description='Action agent for executing tasks',
@@ -93,13 +90,13 @@ class ComplexAgent(Agent):
             [!] Craft a axe: I don't have enough resources
             ```
 
-            You must return updated plan if the plan is not finished. 
+            You must return updated plan if the plan is not finished.
             If the plan has completed all tasks and no user-facing reply is needed, return exactly "{self.COMPLETION_PHRASE}".
             If the plan has completed all tasks and a user-facing reply is necessary, return a short user-facing message followed by "{self.COMPLETION_PHRASE}".
             Never include the plan in the completion response.
 
             """,
-            tools=tools.available_methods(),
+            tools=orchestrator._tools.available_methods(),
             output_key='updated_plan')
 
     async def _run_async_impl(
@@ -121,7 +118,7 @@ class ComplexAgent(Agent):
             ),
         )
 
-        async for event in self.loop_agent.run_async(ctx):      
+        async for event in self.loop_agent.run_async(ctx):
             if event.content and event.content.parts:
                 part_texts = [part.text for part in event.content.parts if getattr(part, 'text', None)]
                 if any(self.COMPLETION_PHRASE in part_text for part_text in part_texts):

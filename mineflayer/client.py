@@ -4,7 +4,7 @@ from contextlib import suppress
 from .tools import Tools
 from .events import Events
 from .action_processor import ActionProcessor
-from agents.multi_agent import MultiAgent
+from orchestrators.multi_agent_orchestrator import MultiAgentOrchestrator
 from logger import log
 import asyncio
 mineflayer = require('mineflayer')
@@ -38,7 +38,7 @@ class Client:
         self._events.bind()
         self._init_connect_timer()
         self._tools = Tools(self)
-        self._agent = MultiAgent(self)
+        self._agent = MultiAgentOrchestrator(self)
     
     async def run(self):
         self._log('started')

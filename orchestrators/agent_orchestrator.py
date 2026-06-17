@@ -1,21 +1,21 @@
 import os
 from dotenv import load_dotenv
-from google.adk.agents import Agent
 from google.adk.events import Event, EventActions
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
-from google import genai
 from google.genai import types
 import asyncio
-import queue
-import uuid
 import traceback
 from .state_machine import AgentStateMachine
+from llm_agents import create_general_agent
 from logger import log
 
 load_dotenv()
 
-class BasicAgent:
+class AgentOrchestrator:
+    def _default_model(self) -> str:
+        return 'gemini-3.1-flash-lite'
+
     def __init__(self, client):
         self._client = client
         self._tools = self._client.tools
@@ -47,28 +47,9 @@ class BasicAgent:
         self._root_agent = self._init_general_agent()
 
     def _init_general_agent(self):
-        return Agent(
-            name="basic_agent",
-            # model="gemini-3-flash-preview",
-            # model="gemini-2.5-flash",
-            model="gemini-3.1-flash-lite",
-            description="The main coordinator agent. Handles direct question or can delegate to subagents.",
-            instruction=f"""
-            You are an autonomous Minecraft agent controlling a mob in the game. You must execute the master user's orders efficiently and independently. You can use tools to interact with the game.
-            
-            CRITICAL AUTONOMY RULES:
-            - Do NOT ask the master for permission or confirmation to take intermediate steps. 
-            - If you need a tool, craft it. If you need materials, gather them. Take initiative.
-            - Do NOT ask the master what to do next if you are in the middle of completing a complex task.
-            - Only speak to the master when you have fully completed their request, or if you are completely and unrecoverably stuck.
-            - When you're done with a request, you MUST call `transfer_to_agent` with agent_name="TaskCoordinator" to return control.
-            
-            Your master username is {self._client._master_username}
-            
-            {self._get_knowledge()}
-            {self._get_skills()}
-            """,
-            tools=self._tools.available_methods(),
+        return create_general_agent(
+            model=self._default_model(),
+            orchestrator=self,
         )
 
     def _init_session(self):

@@ -7,12 +7,12 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
-from agents.basic_agent import BasicAgent
+from orchestrators.agent_orchestrator import AgentOrchestrator
 from tests.mocks import MockClient
 
 
 def test_basic_agent_exists():
-    assert BasicAgent is not None
+    assert AgentOrchestrator is not None
 
 
 @pytest.mark.skipif(
@@ -35,7 +35,7 @@ def test_basic_agent_answers_prompt():
 
     runner = Runner(
         app_name=app_name,
-        agent=BasicAgent(MockClient())._root_agent,
+        agent=AgentOrchestrator(MockClient())._root_agent,
         session_service=session_service,
     )
 
