@@ -8,6 +8,7 @@ from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
 from agents.basic_agent import BasicAgent
+from tests.mocks import MockClient
 
 
 def test_basic_agent_exists():
@@ -31,15 +32,6 @@ def test_basic_agent_answers_prompt():
             session_id=session_id,
         )
     )
-    
-    class MockTools:
-        def available_methods(self):
-            return []
-
-    class MockClient:
-        def __init__(self):
-            self.tools = MockTools()
-            self._master_username = "master"
 
     runner = Runner(
         app_name=app_name,

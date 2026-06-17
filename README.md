@@ -1,3 +1,11 @@
+## Testing
+
+Run tests using [uv](https://docs.astral.sh/uv/):
+
+```bash
+uv run pytest
+```
+
 ## Bot Viewer (Prismarine Viewer)
 
 This repo now includes a `viewer` Docker service using `prismarine-viewer` to watch a Mineflayer bot in your browser.
