@@ -7,14 +7,14 @@ class PathfindingEvents(Base):
 
     def bind(self):
         @On(self._bot, 'goal_reached')
-        def on_goal_reached(this, goal):
+        def on_goal_reached(goal=None):
             trace_id = self.trace_id()
             msg = 'success: Mob reached destination'
             self._log(msg, trace_id)
             self._client.action_processor.enqueue_system_event('pathfinding_result', msg, trace_id)
 
         @On(self._bot, 'path_update')
-        def on_path_update(this, data):
+        def on_path_update(data=None):
             status = data.get('status')
             trace_id = self.trace_id()
             msg = f'path update: {status}'
@@ -27,7 +27,7 @@ class PathfindingEvents(Base):
                 self._client.action_processor.enqueue_system_event('pathfinding_result', 'error: No path found', trace_id)
                 
         @On(self._bot, 'path_reset')
-        def on_path_reset(this, reason):
+        def on_path_reset(reason=None):
             trace_id = self.trace_id()
             msg = f'path reset: {reason}'
             self._log(msg, trace_id)
@@ -36,7 +36,7 @@ class PathfindingEvents(Base):
             # self._agent.enqueue_event('path_reset', f"Mob is on the path, but path was reset because of reason: {reason}", trace_id)
 
         @On(self._bot, 'path_stop')
-        def on_path_stop(this):
+        def on_path_stop():
             trace_id = self.trace_id()
             msg = "success: pathing was stopped"
             self._log(msg, trace_id)

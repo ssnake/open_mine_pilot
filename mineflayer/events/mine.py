@@ -4,7 +4,7 @@ from .base import Base
 class MineEvents(Base):
     def bind(self):
         @On(self._bot, 'diggingCompleted')
-        def on_digging_completed(this, block):
+        def on_digging_completed(block=None):
             block_name = getattr(block, 'name', 'unknown')
             msg = f'Finished digging block at {block.position.x}, {block.position.y}, {block.position.z}'
             trace_id = self.trace_id()
@@ -14,7 +14,7 @@ class MineEvents(Base):
                 
 
         @On(self._bot, 'diggingAborted')
-        def on_digging_aborted(this, block):
+        def on_digging_aborted(block=None):
             block_name = getattr(block, 'name', 'unknown')
             msg = f'Digging aborted for block {block_name} at {block.position.x}, {block.position.y}, {block.position.z}'
             trace_id = self.trace_id()
