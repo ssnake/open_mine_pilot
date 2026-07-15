@@ -15,24 +15,52 @@ The ADK documentation supports the `/llms.txt` standard for context discovery.
 
 ## Architecture
 
-The project follows a component-based architecture:
+The project separates the **Minecraft transport layer** (`mineflayer/`) from the **agent logic** (`orchestrators/` + `llm_agents/`). The transport layer owns the bot connection, tools, events, and the action queue; the orchestrators own the ADK session/runner and drive the LLM agents.
+
+```
+main.py
+  └─ Client (mineflayer/client.py)
+       ├─ Tools            (mineflayer/tools/)      — bot capabilities exposed to agents
+       ├─ Events           (mineflayer/events/)     — bot event handlers
+       ├─ ActionProcessor  (mineflayer/action_processor.py) — async action + event queue
+       └─ MultiAgentOrchestrator (orchestrators/)
+            ├─ AgentStateMachine (orchestrators/state_machine.py)
+            ├─ ADK Runner + InMemorySessionService
+            └─ LLM agents (llm_agents/)
+                 ├─ TaskCoordinator  (create_task_coordinator) — routes requests
+                 └─ ComplexAgent     — Planner + Action LoopAgent
+```
 
 ### 1. The Client (`mineflayer/client.py`)
 The `Client` class is the main entry point for the Minecraft connection. It uses `JSPyBridge` (`javascript` module) to:
 *   Instantiate the Mineflayer bot (`mineflayer.createBot`).
-*   Manage connection states (IDLE, CONNECTING, CONNECTED, DISCONNECTED).
-*   Initialize the `prismarine-viewer` for a web-based view of the bot.
-*   Expose `Tools` to the agent.
+*   Manage connection states (`STATE_IDLE`, `STATE_CONNECTING`, `STATE_CONNECTED`, `STATE_DISCONNECTED`) and run a `_heartbeat_loop` that flips to `DISCONNECTED` when the JS bridge becomes unresponsive.
+*   Wire up `Events`, `Tools`, the `ActionProcessor`, and the `MultiAgentOrchestrator`.
+*   Optionally initialize `prismarine-viewer` (`_reassure_viewer`, port 3001) for a web-based view of the bot.
+*   Run the main loop (`run`), pulling actions off the `ActionProcessor`.
 
-### 2. The Agent (`agents/base_agent.py`)
-The `BaseAgent` class encapsulates the AI logic using Google ADK:
-*   **Agent Definition**: Defines the `root_agent` ("main_minecraft_agent") with specific instructions and the `gemini-2.5-flash` model.
-*   **Session Management**: Uses `InMemorySessionService` to maintain conversation state.
-*   **Runner**: The `Runner` class executes the agent loop, processing user messages and agent tool calls asynchronously.
-*   **Knowledge**: Injects static knowledge about Minecraft (e.g., item prefixes) into the agent's context.
+### 2. The ActionProcessor (`mineflayer/action_processor.py`)
+Bridges the synchronous JS event callbacks and the async agent loop. It holds two queues:
+*   An **action queue** for outgoing bot actions (`whisper`, `say`, `chat`). Master chat messages are dispatched to the agent via `_handle_chat` → `orchestrator.call_async`.
+*   An **expecting-events queue** for `[SYSTEM EVENT: ...]` markers. Tools call `wait_for_events` to block on a specific completion event (e.g. `diggingCompleted`).
 
-### 3. Tooling
-The agent interacts with the world through a set of defined tools. These tools are Python methods that wrap Mineflayer API calls, exposed to the ADK agent.
+### 3. Orchestrators (`orchestrators/`)
+The orchestrator owns everything ADK-related and is the boundary the transport layer talks to.
+*   **`AgentOrchestrator`** (base): sets up the `InMemorySessionService`, the `Runner`, and the `AgentStateMachine`. `call_async` runs the ADK loop with retry/backoff on transient LLM errors (`503`, `429`, `RESOURCE_EXHAUSTED`, etc.). Default model is `gemini-3.1-flash-lite` (`_default_model`). Injects `get_knowledge()` (`knowledge.md`) and `get_skills()` (`skills/*.md`) into agent instructions.
+*   **`MultiAgentOrchestrator`** (used by `Client`): overrides `_init_agents` to build a `TaskCoordinator` root agent with a `ComplexAgent` sub-agent.
+*   **`AgentStateMachine`** (`state_machine.py`): tracks expectation states (`STATE_EXPECT_DIGGING`, `STATE_EXPECT_COLLECTION`, `STATE_EXPECT_CRAFTING`, `STATE_EXPECT_PLACEMENT`, `STATE_EXPECT_DESTINATION`) to filter noise events, and enforces a 60s timeout per expected state.
+
+### 4. LLM Agents (`llm_agents/`)
+The actual ADK agent definitions, decoupled from orchestration and constructed via factory functions that take an `orchestrator`:
+*   **`create_general_agent`**: a single autonomous `Agent` with all tools (used by the base `AgentOrchestrator`).
+*   **`create_task_coordinator`**: an `LlmAgent` that routes user requests to sub-agents and keeps user-facing chatter minimal.
+*   **`ComplexAgent`**: a custom `Agent` wrapping a `LoopAgent` of a **PlannerAgent** (writes a markdown checkbox plan) and an **ActionAgent** (executes steps with tools, marks `[x]`/`[!]`). Loops until the `ALL IS DONE` completion phrase.
+
+### 5. Tooling (`mineflayer/tools/`)
+Agents interact with the world through Python methods that wrap Mineflayer API calls. The `Tools` aggregator (`tools/__init__.py`) composes topic modules — `MovementTools`, `InventoryTools`, `CreativeTools`, `BasicTools`, `MineTool`, `CollectTool`, `CraftingTool`, `BuildingTool` — and `available_methods()` returns the flat list handed to the ADK agents. All extend `tools/base.py` (shared helpers, lazy `minecraft-data`/pathfinder setup, `_result` dict convention).
+
+### 6. Events (`mineflayer/events/`)
+The `Events` aggregator binds handler modules (`BasicEvents`, `PathfindingEvents`, `MineEvents`) to bot events. Handlers translate raw Mineflayer events into `ActionProcessor` calls (e.g. master `chat` → agent) or `[SYSTEM EVENT]` markers, and keep Python references alive to avoid GC of the JS callbacks.
 
 ## Setup & Execution
 
